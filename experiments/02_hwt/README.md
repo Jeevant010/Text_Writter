@@ -1,6 +1,6 @@
 # Option 02 — HWT (Handwriting Transformers)
 
-**The CPU-friendly fallback and development engine.**
+**Runs anywhere — CPU or GPU. The default engine when no NVIDIA GPU is present.**
 
 ## How it works (technical)
 
@@ -35,11 +35,24 @@
 ## Usage — for coders
 
 ```bash
+# no photo needed — bundled handwriting samples are used automatically
+python experiments/02_hwt/test_inference.py --text "The quick brown fox"
+
+# with your own handwriting
 python experiments/02_hwt/test_inference.py \
     --style samples/my_handwriting.jpg \
     --text "The quick brown fox" \
     --out out/hwt_test.png
 ```
+
+First run clones the official repo and downloads the ~685 MB bundle (weights + IAM
+samples); after that it's cached and generation takes seconds per word on CPU.
+
+## Which engine runs?
+
+`quicktest.py` prefers One-DM on a CUDA GPU and falls back to HWT otherwise; force it
+with `--engine hwt` (or `TW_ENGINE=hwt`). HWT is the right choice on the i5 laptop, or
+on a GPU machine when you want speed over maximum fidelity.
 
 ## Usage — for non-coders
 
