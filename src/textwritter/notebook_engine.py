@@ -57,6 +57,57 @@ INKS = {
 }
 
 
+PAGE_SIZE = (1200, 1600)
+PAGE_TOP = 170
+PAGE_LEFT = 190
+PAGE_RIGHT = 1100
+PAGE_LINE_H = 56
+
+
+def make_blank_ruled_page(
+    paper_type: str = "ruled",
+    date_str: str = "___/___/20___",
+    page_no: str = "________",
+) -> Image.Image:
+    """Empty student notebook page (ivory paper, red margin, blue ruling)."""
+    width, height = PAGE_SIZE
+    paper_color = (253, 251, 247)
+    img = Image.new("RGB", (width, height), paper_color)
+    grain = np.random.normal(0, 1.8, (height, width, 3)).astype(np.int16)
+    base = np.array(img).astype(np.int16)
+    img = Image.fromarray(np.clip(base + grain, 0, 255).astype(np.uint8))
+    draw = ImageDraw.Draw(img)
+    left_margin = PAGE_LEFT
+
+    if paper_type == "ruled":
+        header_font_path = FONTS_DIR / "PatrickHand.ttf"
+        header_font = (
+            ImageFont.truetype(str(header_font_path), 24)
+            if header_font_path.exists()
+            else ImageFont.load_default()
+        )
+        draw.text((width - 320, 60), f"Date: {date_str}", fill=(160, 160, 180), font=header_font)
+        draw.text((width - 320, 95), f"Page No: {page_no}", fill=(160, 160, 180), font=header_font)
+        draw.line([(left_margin, 0), (left_margin, height)], fill=(225, 110, 110), width=2)
+        draw.line([(left_margin - 6, 0), (left_margin - 6, height)], fill=(238, 155, 155), width=1)
+        y = PAGE_TOP
+        while y < height - 80:
+            draw.line([(0, y), (width, y)], fill=(185, 210, 235), width=1)
+            y += PAGE_LINE_H
+    elif paper_type == "grid":
+        grid_size = 40
+        for gx in range(0, width, grid_size):
+            draw.line([(gx, 0), (gx, height)], fill=(215, 230, 245), width=1)
+        for gy in range(0, height, grid_size):
+            draw.line([(0, gy), (width, gy)], fill=(215, 230, 245), width=1)
+    return img
+
+
+def lines_per_page() -> int:
+    height = PAGE_SIZE[1]
+    return (height - PAGE_TOP - 100) // PAGE_LINE_H
+
+
 def render_notebook_copy(
     text: str,
     out_path: str | Path,
@@ -68,47 +119,13 @@ def render_notebook_copy(
     wobble: bool = True,
 ) -> dict:
     """Render text on ruled notebook paper ('copy with lines') with realistic ink and lines."""
-    width, height = 1200, 1600
-    paper_color = (253, 251, 247)  # Warm realistic notebook ivory
-
-    img = Image.new("RGB", (width, height), paper_color)
-
-    # 1. Subtle Paper Texture Grain
-    grain = np.random.normal(0, 1.8, (height, width, 3)).astype(np.int16)
-    base = np.array(img).astype(np.int16)
-    img = Image.fromarray(np.clip(base + grain, 0, 255).astype(np.uint8))
+    img = make_blank_ruled_page(paper_type=paper_type, date_str=date_str, page_no=page_no)
     draw = ImageDraw.Draw(img)
-
-    top_margin = 170
-    left_margin = 190
-    right_margin = width - 100
-    line_height = 56
-
-    # 2. Draw Paper Template
-    if paper_type == "ruled":
-        # Header text
-        header_font_path = FONTS_DIR / "PatrickHand.ttf"
-        header_font = ImageFont.truetype(str(header_font_path), 24) if header_font_path.exists() else ImageFont.load_default()
-        draw.text((width - 320, 60), f"Date: {date_str}", fill=(160, 160, 180), font=header_font)
-        draw.text((width - 320, 95), f"Page No: {page_no}", fill=(160, 160, 180), font=header_font)
-
-        # Red double margin lines on left
-        draw.line([(left_margin, 0), (left_margin, height)], fill=(225, 110, 110), width=2)
-        draw.line([(left_margin - 6, 0), (left_margin - 6, height)], fill=(238, 155, 155), width=1)
-
-        # Horizontal blue ruling lines
-        y = top_margin
-        while y < height - 80:
-            draw.line([(0, y), (width, y)], fill=(185, 210, 235), width=1)
-            y += line_height
-
-    elif paper_type == "grid":
-        # Math grid
-        grid_size = 40
-        for gx in range(0, width, grid_size):
-            draw.line([(gx, 0), (gx, height)], fill=(215, 230, 245), width=1)
-        for gy in range(0, height, grid_size):
-            draw.line([(0, gy), (width, gy)], fill=(215, 230, 245), width=1)
+    width, height = img.size
+    top_margin = PAGE_TOP
+    left_margin = PAGE_LEFT
+    right_margin = PAGE_RIGHT
+    line_height = PAGE_LINE_H
 
     # 3. Load Handwriting Font
     style_info = STYLES.get(style_key, STYLES["kalam"])
