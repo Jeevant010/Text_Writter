@@ -206,6 +206,16 @@ tempCodeRunnerFile.py
 # Ruff stuff:
 .ruff_cache/
 
+# Text_Writter artifacts (never commit: clones, weights, generated output)
+experiments/*/_vendor/
+checkpoints/
+out/
+data_uploads/
+samples/*.zip
+# Bundled style samples are extracted at runtime from the official HWT bundle.
+# Not committed: IAM is research-licensed, so we do not redistribute its crops.
+assets/sample_styles/
+
 # PyPI configuration file
 .pypirc
 
@@ -216,3 +226,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+.vscode/.commandcode/
+assets/fonts/

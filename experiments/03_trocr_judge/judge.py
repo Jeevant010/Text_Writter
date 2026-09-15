@@ -36,13 +36,36 @@ def cer(target: str, recognized: str) -> float:
     return prev[-1] / len(t)
 
 
-def recognize(image: Path) -> str:
-    from transformers import TrOCRProcessor, VisionEncoderDecoderModel
+def _device(requested: str = "auto") -> str:
+    if requested != "auto":
+        return requested
+    try:
+        import torch
+        return "cuda" if torch.cuda.is_available() else "cpu"
+    except Exception:  # noqa: BLE001
+        return "cpu"
+
+
+def recognize(image: Path, device: str = "auto") -> str:
+    from transformers import (
+        RobertaTokenizerFast,
+        TrOCRProcessor,
+        VisionEncoderDecoderModel,
+        ViTImageProcessor,
+    )
     from PIL import Image
 
-    processor = TrOCRProcessor.from_pretrained(MODEL_ID)
-    model = VisionEncoderDecoderModel.from_pretrained(MODEL_ID)
-    pixel = processor(images=Image.open(image).convert("RGB"), return_tensors="pt").pixel_values
+    dev = _device(device)
+    try:
+        processor = TrOCRProcessor.from_pretrained(MODEL_ID)
+    except Exception:
+        img_proc = ViTImageProcessor.from_pretrained(MODEL_ID)
+        tok = RobertaTokenizerFast.from_pretrained(MODEL_ID)
+        processor = TrOCRProcessor(image_processor=img_proc, tokenizer=tok)
+
+    model = VisionEncoderDecoderModel.from_pretrained(MODEL_ID).to(dev)
+    pixel = processor(images=Image.open(image).convert("RGB"),
+                      return_tensors="pt").pixel_values.to(dev)
     ids = model.generate(pixel)
     return processor.batch_decode(ids, skip_special_tokens=True)[0]
 
@@ -52,9 +75,10 @@ def main() -> None:
     ap.add_argument("--image", type=Path, required=True)
     ap.add_argument("--expect", required=True, help="the text the image is supposed to say")
     ap.add_argument("--threshold", type=float, default=DEFAULT_THRESHOLD)
+    ap.add_argument("--device", default="auto", help="auto | cuda | cpu")
     args = ap.parse_args()
 
-    recognized = recognize(args.image)
+    recognized = recognize(args.image, device=args.device)
     score = cer(args.expect, recognized)
     verdict = "PASS" if score <= args.threshold else "FAIL (re-roll)"
 

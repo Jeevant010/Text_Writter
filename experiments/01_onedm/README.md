@@ -1,6 +1,7 @@
 # Option 01 — One-DM (One-Shot Diffusion Mimicker)
 
-**The primary engine. Best quality per sample. This is the one to try first.**
+**The GPU engine — best quality from a single sample.** Needs an NVIDIA CUDA GPU
+(the official runner uses NCCL); on a CPU-only machine use Option 02 (HWT) instead.
 
 ## How it works (technical)
 
@@ -39,15 +40,19 @@
 ## Usage — for coders
 
 ```bash
+# readiness check first (no downloads, no GPU work)
+python experiments/01_onedm/test_inference.py --check
+
+# generate: one photo (or omit --style to use the bundled handwriting samples)
 python experiments/01_onedm/test_inference.py \
     --style samples/my_handwriting.jpg \
     --text "Hello world" \
     --out out/onedm_test.png
 ```
 
-The script clones the official repo, downloads the pretrained checkpoint, preprocesses
-your photo (deskew + binarize + crop), and runs inference. First run downloads ~5 GB
-(checkpoint + SD 1.5 VAE).
+The script clones the official repo, fetches the pretrained checkpoint + English data
+bundle (multi-GB, one time), lays your photo out as a single "writer", and runs their
+inference for just your words, then assembles them into one line image.
 
 ## Usage — for non-coders
 

@@ -1,20 +1,29 @@
 """Backend protocol — the swap point between One-DM (GPU) and HWT (CPU).
 
-Both official repos are driven as-is; this module picks which one is active.
+Both official repos are driven as-is through their engine adapters; this module
+exposes the one function the agent loop needs and lets runtime.py pick which
+engine is active.
 """
 from __future__ import annotations
 
+import sys
+from pathlib import Path
 
-def render_line(text: str, style_id: str, seed: int,
-                jitter: float, slant_deg: float) -> str:
-    """Render one line of handwriting; returns path to the PNG.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-    TODO(phase-2): wire to experiments/01_onedm (GPU) or 02_hwt (CPU),
-    selected by torch.cuda.is_available(). Until then this is a stub that
-    raises loudly instead of silently producing nothing.
+from textwritter.pipeline import render_line as _render_line  # noqa: E402
+from textwritter.runtime import resolve_engine  # noqa: E402
+
+
+def render_line(text: str, style_id: str | None = None, seed: int = 0,
+                jitter: float = 0.0, slant_deg: float = 0.0,
+                engine: str = "auto", out: str | Path | None = None) -> str:
+    """Render one line of handwriting; returns the path to the PNG.
+
+    `style_id` may be a photo path; None uses the bundled handwriting samples.
+    `engine="auto"` uses One-DM on a CUDA GPU and HWT everywhere else.
+    `seed`/`jitter`/`slant_deg` are accepted for interface compatibility —
+    deterministic parameter control lands with the enroll/profile step.
     """
-    raise NotImplementedError(
-        "No handwriting backend wired yet. "
-        "Run experiments/01_onedm/test_inference.py or 02_hwt first, "
-        "then wrap it here."
-    )
+    path = _render_line(text, style=style_id, engine=engine, out=out, seed=seed)
+    return str(path)

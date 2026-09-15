@@ -62,10 +62,11 @@ draft ──► render ──► judge ──┬─ CER>15% & tries<3 ─► aut
 
 ## 5. Priority order (don't waste time on smaller things)
 
-1. **Run `notebooks/00_quick_test_colab.ipynb`** — see YOUR handwriting via pretrained
-   One-DM today. This is the single most validating step.
+1. **Run `notebooks/00_quick_test.ipynb`** (Colab or local — it clones this repo) or
+   `python src/textwritter/quicktest.py` — see YOUR handwriting today. This is the
+   single most validating step. The engine auto-picks One-DM on a GPU, HWT elsewhere.
 2. If good → build CLI around it (Phase 0–2). If style is off → optional fine-tune
-   notebooks (they resume from Drive; see [COLAB_GUIDE](COLAB_GUIDE.md)).
+   flows (same commands on a GPU PC and Colab; see [COLAB_GUIDE](COLAB_GUIDE.md)).
 3. Wire `agent/backends.py` to the working backend → the LangGraph loop comes alive.
 4. FastAPI wrapper → website. (MCP only if you later want Claude/Cursor to drive it.)
 

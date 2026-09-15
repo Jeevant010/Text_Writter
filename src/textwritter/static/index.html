@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Text_Writter — Real Handwriting & Lined Notebook Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Kalam:wght@400;700&family=Caveat:wght@600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-main: #0a0d14;
+      --bg-card: rgba(18, 24, 38, 0.75);
+      --bg-card-hover: rgba(24, 32, 50, 0.85);
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --border-focus: rgba(99, 102, 241, 0.5);
+      --accent-primary: #6366f1;
+      --accent-gradient: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #d946ef 100%);
+      --accent-glow: rgba(99, 102, 241, 0.25);
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --success: #10b981;
+      --success-glow: rgba(16, 185, 129, 0.2);
+      --warning: #f59e0b;
+      --error: #ef4444;
+      --radius-sm: 8px;
+      --radius-md: 14px;
+      --radius-lg: 20px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg-main);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      background-image: 
+        radial-gradient(circle at 15% 15%, rgba(99, 102, 241, 0.12) 0%, transparent 40%),
+        radial-gradient(circle at 85% 85%, rgba(217, 70, 239, 0.08) 0%, transparent 40%);
+      background-attachment: fixed;
+    }
+
+    header {
+      border-bottom: 1px solid var(--border-subtle);
+      backdrop-filter: blur(16px);
+      background: rgba(10, 13, 20, 0.8);
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      padding: 1rem 2rem;
+    }
+
+    .nav-container {
+      max-width: 1280px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .logo-group {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .logo-badge {
+      width: 40px;
+      height: 40px;
+      background: var(--accent-gradient);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.3rem;
+      box-shadow: 0 4px 14px var(--accent-glow);
+    }
+
+    .logo-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .logo-subtitle {
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      font-weight: 500;
+    }
+
+    .runtime-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border-subtle);
+      padding: 0.4rem 0.85rem;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--success);
+      box-shadow: 0 0 8px var(--success-glow);
+    }
+
+    main {
+      flex: 1;
+      max-width: 1280px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+      display: grid;
+      grid-template-columns: 480px 1fr;
+      gap: 2rem;
+    }
+
+    @media (max-width: 960px) {
+      main {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 1.75rem;
+      backdrop-filter: blur(12px);
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+      transition: border-color 0.2s;
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border-subtle);
+      padding-bottom: 0.85rem;
+    }
+
+    .panel-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    /* Engine Mode Tabs */
+    .engine-switcher {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      background: rgba(10, 13, 20, 0.6);
+      padding: 0.35rem;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-subtle);
+      gap: 0.35rem;
+    }
+
+    .engine-tab {
+      padding: 0.65rem 0.5rem;
+      border-radius: var(--radius-sm);
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+      transition: all 0.2s;
+    }
+
+    .engine-tab.active {
+      background: var(--accent-gradient);
+      color: #fff;
+      box-shadow: 0 2px 10px var(--accent-glow);
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    label {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    textarea {
+      width: 100%;
+      background: rgba(10, 13, 20, 0.6);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 0.85rem;
+      color: var(--text-main);
+      font-family: inherit;
+      font-size: 0.95rem;
+      line-height: 1.5;
+      resize: vertical;
+      min-height: 120px;
+      outline: none;
+      transition: all 0.2s;
+    }
+
+    textarea:focus {
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+
+    .presets {
+      display: flex;
+      gap: 0.4rem;
+      flex-wrap: wrap;
+    }
+
+    .preset-chip {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-subtle);
+      padding: 0.25rem 0.6rem;
+      border-radius: var(--radius-sm);
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .preset-chip:hover {
+      background: rgba(99, 102, 241, 0.15);
+      border-color: var(--accent-primary);
+      color: var(--text-main);
+    }
+
+    .controls-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+    }
+
+    select {
+      width: 100%;
+      background: rgba(10, 13, 20, 0.6);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 0.7rem;
+      color: var(--text-main);
+      font-size: 0.85rem;
+      outline: none;
+    }
+
+    .submit-btn {
+      background: var(--accent-gradient);
+      color: #fff;
+      border: none;
+      padding: 0.9rem;
+      border-radius: var(--radius-md);
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 0.6rem;
+      box-shadow: 0 4px 20px var(--accent-glow);
+      transition: all 0.2s;
+      margin-top: 0.5rem;
+    }
+
+    .submit-btn:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px var(--accent-glow);
+    }
+
+    .submit-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .spinner {
+      width: 18px;
+      height: 18px;
+      border: 3px solid rgba(255, 255, 255, 0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      display: none;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Output Results Area */
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 480px;
+      color: var(--text-dim);
+      text-align: center;
+      gap: 1rem;
+    }
+
+    .empty-icon {
+      font-size: 3.5rem;
+      opacity: 0.4;
+    }
+
+    .result-container {
+      display: none;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    .notebook-card {
+      background: #ffffff;
+      border-radius: var(--radius-md);
+      padding: 0.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      box-shadow: 0 10px 35px rgba(0, 0, 0, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .notebook-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: #334155;
+      font-size: 0.8rem;
+      font-weight: 600;
+      border-bottom: 1px solid #e2e8f0;
+      padding-bottom: 0.5rem;
+    }
+
+    .handwriting-img {
+      width: 100%;
+      height: auto;
+      max-height: 620px;
+      object-fit: contain;
+      background: #fdfbf7;
+      border-radius: 6px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+
+    .handwriting-img:hover {
+      transform: scale(1.005);
+    }
+
+    .action-btn {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-main);
+      padding: 0.4rem 0.8rem;
+      border-radius: var(--radius-sm);
+      font-size: 0.75rem;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      transition: background 0.2s;
+    }
+
+    .action-btn:hover {
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    .action-btn.dark {
+      background: #f1f5f9;
+      color: #0f172a;
+      border-color: #cbd5e1;
+    }
+    .action-btn.dark:hover {
+      background: #e2e8f0;
+    }
+
+    .info-bar {
+      display: flex;
+      gap: 1rem;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border-subtle);
+      padding: 0.6rem 0.85rem;
+      border-radius: var(--radius-sm);
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="nav-container">
+      <div class="logo-group">
+        <div class="logo-badge">📓</div>
+        <div>
+          <div class="logo-title">Text_Writter Studio</div>
+          <div class="logo-subtitle">Realistic Ruled Notebook & AI Handwriting Synthesis</div>
+        </div>
+      </div>
+      <div class="runtime-badge" id="runtimeBadge">
+        <div class="status-dot"></div>
+        <span id="runtimeText">Engine: Ruled Copy (Instant)</span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- LEFT PANEL: Controls -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title"><span>✍️</span> Handwriting Studio</div>
+        <span style="font-size: 0.75rem; color: var(--text-dim);">Real Notebook Engine</span>
+      </div>
+
+      <!-- Mode Switcher -->
+      <div class="engine-switcher">
+        <button class="engine-tab active" id="tabNotebook" onclick="setEngineMode('notebook')">
+          <span>📓</span> Ruled Notebook Copy
+        </button>
+        <button class="engine-tab" id="tabNeural" onclick="setEngineMode('neural')">
+          <span>🤖</span> Neural (HWT / One-DM)
+        </button>
+      </div>
+
+      <!-- Text to Write -->
+      <div class="form-group">
+        <label for="promptText">
+          <span>Content to Write</span>
+          <span id="charCount">142 chars</span>
+        </label>
+        <textarea id="promptText" placeholder="Enter paragraph, notes, or homework to write onto notebook copy lines...">The quick brown fox jumps over the lazy dog.
+This is authentic student handwriting written neatly on a ruled notebook copy with blue lines and red margin.</textarea>
+        
+        <div class="presets">
+          <span class="preset-chip" onclick="setPreset('The quick brown fox jumps over the lazy dog.\nThis is authentic student handwriting written neatly on a ruled notebook copy with blue lines and red margin.')">Class Notes</span>
+          <span class="preset-chip" onclick="setPreset('Euler Formula: e^(i*pi) + 1 = 0.\nLet f(x) be continuous on [a, b] and differentiable on (a, b). By Mean Value Theorem, there exists c in (a, b) such that f\'(c) = (f(b) - f(a)) / (b - a).')">Math Calculus</span>
+          <span class="preset-chip" onclick="setPreset('Assignment 1 — Physics\nTopic: Newton\'s Laws of Motion\nEvery body perseveres in its state of being at rest or of moving uniformly straight forward, except insofar as it is compelled to change its state by force impressed.')">Physics Homework</span>
+        </div>
+      </div>
+
+      <!-- Notebook Specific Controls -->
+      <div id="notebookControls">
+        <div class="controls-grid">
+          <!-- Handwriting Font Style -->
+          <div class="form-group">
+            <label for="styleSelect">Handwriting Style</label>
+            <select id="styleSelect">
+              <option value="kalam" selected>Kalam (Student Notebook)</option>
+              <option value="caveat">Caveat (Flowing Cursive)</option>
+              <option value="indie">Indie Flower (Casual Hand)</option>
+              <option value="patrick">Patrick Hand (Neat Notes)</option>
+            </select>
+          </div>
+
+          <!-- Ink Color -->
+          <div class="form-group">
+            <label for="inkSelect">Pen & Ink Color</label>
+            <select id="inkSelect">
+              <option value="blue" selected>🔵 Classic Blue Ballpoint Pen</option>
+              <option value="black">⚫ Black Gel Pen</option>
+              <option value="darkblue">🌌 Dark Blue (Pilot Pen)</option>
+              <option value="red">🔴 Red Marking Pen</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Paper Type -->
+        <div class="form-group" style="margin-top: 0.5rem;">
+          <label for="paperSelect">Paper Type</label>
+          <select id="paperSelect">
+            <option value="ruled" selected>📓 Ruled Notebook ('Copy with Blue Lines & Red Margin')</option>
+            <option value="blank">📝 Clean Plain Paper</option>
+            <option value="grid">📐 Math Grid Paper</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Neural Engine Controls (Hidden in notebook mode) -->
+      <div id="neuralControls" style="display: none; flex-direction: column; gap: 0.75rem;">
+        <div class="info-bar" style="color: var(--warning);">
+          ⚠️ Neural HWT runs on CPU and takes ~50s per line. Use Google Colab GPU for One-DM.
+        </div>
+        <div class="form-group">
+          <label for="neuralEngineSelect">Model Engine</label>
+          <select id="neuralEngineSelect">
+            <option value="hwt" selected>HWT (CPU Transformer)</option>
+            <option value="onedm">One-DM (CUDA GPU required)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Submit Action -->
+      <button class="submit-btn" id="generateBtn" onclick="generateHandwriting()">
+        <div class="spinner" id="spinner"></div>
+        <span id="btnText">✨ Render Handwriting on Copy</span>
+      </button>
+    </div>
+
+    <!-- RIGHT PANEL: Result -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title"><span>📖</span> Notebook Page Preview</div>
+        <span style="font-size: 0.75rem; color: var(--text-dim);" id="elapsedTime">Ready</span>
+      </div>
+
+      <!-- Empty State -->
+      <div class="empty-state" id="emptyState">
+        <div class="empty-icon">🖋️</div>
+        <h3>No Page Rendered Yet</h3>
+        <p style="font-size: 0.85rem; max-width: 340px;">
+          Type your text on the left, pick your pen ink and handwriting style, and press <b>Render</b> to see your page written on ruled notebook lines in real time!
+        </p>
+      </div>
+
+      <!-- Results View -->
+      <div class="result-container" id="resultContainer">
+        <div class="notebook-card">
+          <div class="notebook-card-header">
+            <span id="cardMeta">STUDENT NOTEBOOK COPY (A4)</span>
+            <div style="display: flex; gap: 0.5rem;">
+              <a class="action-btn dark" id="downloadBtn" download="notebook_copy.png" target="_blank">⬇ Download PNG</a>
+              <a class="action-btn dark" id="openFullBtn" target="_blank">🔍 Full Screen</a>
+            </div>
+          </div>
+          <img id="generatedImg" class="handwriting-img" src="" alt="Notebook Page" onclick="openFullscreen()">
+        </div>
+
+        <div class="info-bar" id="resultInfoBar">
+          <span id="speedStat">⚡ Rendered in 0.08s</span>
+          <span>•</span>
+          <span id="linesStat">Lines: 2</span>
+          <span>•</span>
+          <span id="inkStat">Blue Ballpoint Pen</span>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    let currentEngine = 'notebook';
+
+    // Char counter
+    const promptText = document.getElementById('promptText');
+    promptText.addEventListener('input', updateCharCount);
+    function updateCharCount() {
+      document.getElementById('charCount').innerText = `${promptText.value.length} chars`;
+    }
+    updateCharCount();
+
+    function setPreset(text) {
+      promptText.value = text;
+      updateCharCount();
+    }
+
+    function setEngineMode(mode) {
+      currentEngine = mode;
+      document.getElementById('tabNotebook').classList.toggle('active', mode === 'notebook');
+      document.getElementById('tabNeural').classList.toggle('active', mode === 'neural');
+      document.getElementById('notebookControls').style.display = mode === 'notebook' ? 'block' : 'none';
+      document.getElementById('neuralControls').style.display = mode === 'neural' ? 'flex' : 'none';
+
+      document.getElementById('btnText').innerText = mode === 'notebook'
+        ? '✨ Render Handwriting on Copy'
+        : '⚡ Run Neural Model';
+    }
+
+    async function generateHandwriting() {
+      const text = promptText.value.trim();
+      if (!text) {
+        alert('Please enter text to write.');
+        return;
+      }
+
+      const btn = document.getElementById('generateBtn');
+      const spinner = document.getElementById('spinner');
+      const btnText = document.getElementById('btnText');
+      const elapsed = document.getElementById('elapsedTime');
+
+      btn.disabled = true;
+      spinner.style.display = 'block';
+      btnText.innerText = currentEngine === 'notebook' ? 'Writing on Copy...' : 'Synthesizing...';
+      const startTime = Date.now();
+      const timer = setInterval(() => {
+        elapsed.innerText = `Writing: ${((Date.now() - startTime) / 1000).toFixed(1)}s`;
+      }, 50);
+
+      try {
+        const formData = new FormData();
+        formData.append('text', text);
+
+        if (currentEngine === 'notebook') {
+          formData.append('engine', 'notebook');
+          formData.append('notebook_style', document.getElementById('styleSelect').value);
+          formData.append('ink_color', document.getElementById('inkSelect').value);
+          formData.append('paper_type', document.getElementById('paperSelect').value);
+          formData.append('judge', 'false');
+        } else {
+          formData.append('engine', document.getElementById('neuralEngineSelect').value);
+          formData.append('judge', 'true');
+        }
+
+        const res = await fetch('/api/generate', {
+          method: 'POST',
+          body: formData
+        });
+
+        const data = await res.json();
+        clearInterval(timer);
+        const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+        elapsed.innerText = `Completed in ${duration}s`;
+
+        if (!data.success) {
+          alert('Error: ' + (data.error || 'Failed to render'));
+          return;
+        }
+
+        displayResults(data, duration);
+      } catch (err) {
+        clearInterval(timer);
+        elapsed.innerText = 'Failed';
+        alert('Request failed: ' + err.message);
+      } finally {
+        btn.disabled = false;
+        spinner.style.display = 'none';
+        btnText.innerText = currentEngine === 'notebook'
+          ? '✨ Render Handwriting on Copy'
+          : '⚡ Run Neural Model';
+      }
+    }
+
+    function displayResults(data, duration) {
+      document.getElementById('emptyState').style.display = 'none';
+      const container = document.getElementById('resultContainer');
+      container.style.display = 'flex';
+
+      const img = document.getElementById('generatedImg');
+      img.src = data.image_url;
+      document.getElementById('downloadBtn').href = data.image_url;
+      document.getElementById('openFullBtn').href = data.image_url;
+
+      document.getElementById('speedStat').innerText = `⚡ Rendered in ${duration}s`;
+      if (data.lines_written) {
+        document.getElementById('linesStat').innerText = `Lines: ${data.lines_written}`;
+      }
+      if (data.ink) {
+        document.getElementById('inkStat').innerText = `Ink: ${data.ink.toUpperCase()}`;
+      }
+      document.getElementById('cardMeta').innerText = data.paper
+        ? `NOTEBOOK (${data.paper.toUpperCase()}) — ${data.style || 'Kalam'}`
+        : 'NEURAL MODEL OUTPUT';
+    }
+
+    function openFullscreen() {
+      const img = document.getElementById('generatedImg');
+      if (img.src) {
+        window.open(img.src, '_blank');
+      }
+    }
+  </script>
+</body>
+</html>
