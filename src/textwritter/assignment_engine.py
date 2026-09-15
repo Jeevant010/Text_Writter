@@ -222,18 +222,75 @@ def parse_segments(text: str) -> list[tuple[str, str]]:
 
 def measure_segments(segments: list[tuple[str, str]], font_path: Path,
                      size: int) -> int:
+    from textwritter.glyphs import aspect
+
     total = 0
     for chunk, kind in segments:
         csize = max(8, int(size * SUP_SCALE)) if kind != "normal" else size
         for run, path in glyph_runs(chunk, font_path):
             f = _load_font(str(path), csize)
-            total += int(f.getlength(run))
+            if path == font_path:
+                total += int(f.getlength(run))
+                continue
+            for ch in run:
+                ratio = aspect(ch)
+                if ratio is None:
+                    total += int(f.getlength(ch))
+                else:
+                    h_ratio = _GLYPH_METRICS.get(ch, _GLYPH_DEFAULT)[0]
+                    total += int(csize * h_ratio * ratio) + max(2, csize // 12)
     return total
 
 
 # Upright fallback glyphs next to slanted handwriting read as "typed", so the
 # math runs get sheared to roughly the handwriting's lean.
 FALLBACK_SHEAR = 0.16
+
+# Placement for handwritten symbol images: (height / font size, how far the
+# bottom sits below the baseline / font size). Arrows float at mid x-height,
+# big operators overhang, most symbols sit on the line.
+_GLYPH_METRICS: dict[str, tuple[float, float]] = {
+    "→": (0.44, 0.13), "←": (0.44, 0.13), "⇒": (0.44, 0.13), "⇔": (0.44, 0.13),
+    "Σ": (0.90, -0.06), "∏": (0.90, -0.06), "√": (0.90, -0.04),
+    "∇": (0.70, 0.0), "∂": (0.78, -0.10),
+    "≤": (0.52, 0.04), "≥": (0.52, 0.04), "≠": (0.62, 0.0), "≈": (0.30, 0.16),
+    "×": (0.34, 0.14), "·": (0.12, 0.14), "∞": (0.34, 0.14),
+    "β": (0.80, -0.18), "γ": (0.60, -0.18), "μ": (0.58, -0.16),
+    "σ": (0.48, 0.0), "λ": (0.72, 0.0), "θ": (0.78, 0.0), "δ": (0.74, 0.0),
+    "α": (0.46, 0.0), "ε": (0.46, 0.0), "π": (0.46, 0.0), "Δ": (0.70, 0.0),
+}
+_GLYPH_DEFAULT = (0.58, 0.0)
+
+
+def _draw_handwritten_glyph(img: Image.Image, ch: str, x: int, baseline_y: float,
+                            size: int, ink: tuple) -> int | None:
+    """Paste one of the user's own symbol scans. Returns advance, or None."""
+    from textwritter.glyphs import pick
+
+    path = pick(ch)
+    if path is None:
+        return None
+    try:
+        src = Image.open(path).convert("L")
+    except Exception:  # noqa: BLE001 - a bad crop should not kill the page
+        return None
+
+    h_ratio, drop = _GLYPH_METRICS.get(ch, _GLYPH_DEFAULT)
+    target_h = max(4, int(size * h_ratio))
+    scale = target_h / max(1, src.height)
+    target_w = max(3, int(src.width * scale))
+    src = src.resize((target_w, target_h), Image.LANCZOS)
+
+    arr = np.asarray(src, dtype=np.float32)
+    alpha = np.clip((215.0 - arr) / 120.0, 0.0, 1.0)
+    tile = np.zeros((target_h, target_w, 4), dtype=np.uint8)
+    tile[..., 0], tile[..., 1], tile[..., 2] = ink
+    tile[..., 3] = (alpha * 255).astype(np.uint8)
+
+    top = int(baseline_y + size * drop - target_h)
+    img.paste(Image.fromarray(tile, "RGBA"), (int(x), top),
+              Image.fromarray(tile, "RGBA"))
+    return target_w + max(2, size // 12)
 
 
 def _draw_sheared(img: Image.Image, run: str, font: ImageFont.FreeTypeFont,
@@ -270,9 +327,16 @@ def draw_segments(img: Image.Image, draw: ImageDraw.ImageDraw, x: int,
             run_ink = _jitter_ink(ink, wobble)
             if path == font_path:
                 draw.text((x, top), run, fill=run_ink, font=f)
-            else:
-                _draw_sheared(img, run, f, x, top, run_ink)
-            x += int(f.getlength(run))
+                x += int(f.getlength(run))
+                continue
+            # Fallback run: prefer the user's own handwritten symbol scans.
+            for ch in run:
+                advance = _draw_handwritten_glyph(
+                    img, ch, x, baseline_y + dy + jitter, csize, run_ink)
+                if advance is None:
+                    _draw_sheared(img, ch, f, x, top, run_ink)
+                    advance = int(f.getlength(ch))
+                x += advance
     return x
 
 
@@ -314,6 +378,19 @@ SYMBOL_MAP = {
     r"\emptyset": "∅",
     r"\nabla": "∇",
     r"\sqrt": "√",
+    r"\int": "∫",
+    r"\pm": "±",
+    r"\ldots": "…",
+    r"\cdots": "…",
+    # Capital Greek — common in DL notation (Σ loss, Δ weights, Θ params).
+    r"\Sigma": "Σ",
+    r"\Delta": "Δ",
+    r"\Theta": "Θ",
+    r"\Lambda": "Λ",
+    r"\Omega": "Ω",
+    r"\Phi": "Φ",
+    r"\Gamma": "Γ",
+    r"\Pi": "∏",
     "R": "R",  # Keep R as-is (used in R^n notation)
 }
 
