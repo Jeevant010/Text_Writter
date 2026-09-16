@@ -19,6 +19,25 @@ After that, the command `python` means this project's Python. If you ever see
 
 ---
 
+## STEP 0.5 — Full assignment on ruled paper (CPU, no GPU)
+
+This writes a multi-page PDF that looks like a notebook. It uses a cursive font
+(Caveat), not a clone of your handwriting. Markup and details:
+[docs/ASSIGNMENT_PAGES.md](docs/ASSIGNMENT_PAGES.md).
+
+```bash
+PYTHONPATH=src python src/textwritter/assignment_engine.py \
+  samples/assignment2_solutions.txt \
+  output/a2/Assignment2_solutions.pdf \
+  --style caveat --ink blue
+xdg-open output/a2/Assignment2_solutions.pdf
+```
+
+Put your own answers in a `.txt` file (same markup as that sample) and pass that
+path instead. Windows: `write_pages.bat samples\assignment2_solutions.txt`.
+
+---
+
 ## STEP 1 — Create handwriting (the main thing)
 
 ```bash
@@ -136,7 +155,9 @@ Same command on Colab and on a GPU PC. Only needed if the pretrained result look
 |---|---|
 | `out/quicktest_hwt.png` | the generated handwriting image |
 | `out/quicktest_hwt_compare.png` | side-by-side: your style vs generated |
-| `samples/` | put your handwriting photos here |
+| `samples/` | handwriting photos **and** assignment `.txt` (e.g. `assignment2_solutions.txt`) |
+| `output/a2/` | rendered Assignment 2 PDF + page PNGs |
+| `docs/ASSIGNMENT_PAGES.md` | assignment markup, styles, glyph sheet |
 | `assets/sample_styles/` | bundled handwriting used when you pass no photo |
 | `experiments/02_hwt/_vendor/` | downloaded model code + weights (ignore this) |
 | `checkpoints/` | fine-tune checkpoints (created when you train) |
@@ -160,6 +181,7 @@ Same command on Colab and on a GPU PC. Only needed if the pretrained result look
 
 ```bash
 cd /home/jeevant/Desktop/Text_Writter && source .venv/bin/activate
+PYTHONPATH=src python src/textwritter/assignment_engine.py samples/assignment2_solutions.txt output/a2/out.pdf --style caveat --ink blue
 python src/textwritter/quicktest.py --style samples/YOUR_PHOTO.jpg --text "your text here"
-xdg-open out/quicktest_hwt.png
+xdg-open output/a2/out.pdf
 ```
