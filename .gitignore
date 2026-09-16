@@ -210,6 +210,7 @@ tempCodeRunnerFile.py
 experiments/*/_vendor/
 checkpoints/
 out/
+output/
 data_uploads/
 samples/*.zip
 # Bundled style samples are extracted at runtime from the official HWT bundle.
