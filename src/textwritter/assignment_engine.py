@@ -307,6 +307,50 @@ def _draw_sheared(img: Image.Image, run: str, font: ImageFont.FreeTypeFont,
     img.paste(tile, (int(x - pad // 2), int(top - 2)), tile)
 
 
+# A font draws every 'a' identically, which is the loudest "not handwritten"
+# signal on an otherwise good page. Nudging each glyph's angle/scale/weight
+# breaks that up without needing a model.
+CHAR_ANGLE = 2.2      # degrees, peak
+CHAR_SCALE = 0.045    # fraction, peak
+CHAR_SHIFT = 0.9      # px, peak
+
+
+def _draw_char(img: Image.Image, ch: str, font: ImageFont.FreeTypeFont,
+               x: float, top: float, ink: tuple) -> None:
+    """One glyph, slightly rotated/resized so repeats are never identical."""
+    pad = 8
+    w = int(font.getlength(ch)) + pad * 2
+    h = int(font.size * 2.0) + pad * 2
+    mask = Image.new("L", (max(1, w), max(1, h)), 0)
+    ImageDraw.Draw(mask).text((pad, pad), ch, fill=255, font=font)
+
+    scale = 1.0 + random.uniform(-CHAR_SCALE, CHAR_SCALE)
+    if abs(scale - 1.0) > 0.005:
+        mask = mask.resize((max(1, int(mask.width * scale)),
+                            max(1, int(mask.height * scale))), Image.LANCZOS)
+    angle = random.uniform(-CHAR_ANGLE, CHAR_ANGLE)
+    mask = mask.rotate(angle, resample=Image.BICUBIC, expand=False)
+
+    dx = random.uniform(-CHAR_SHIFT, CHAR_SHIFT)
+    dy = random.uniform(-CHAR_SHIFT, CHAR_SHIFT)
+    img.paste(ink, (int(x - pad + dx), int(top - pad + dy)), mask)
+
+
+def _draw_run(img: Image.Image, draw: ImageDraw.ImageDraw, run: str,
+              font: ImageFont.FreeTypeFont, x: float, top: float, ink: tuple,
+              humanize: bool) -> float:
+    """Draw a run of same-font text; returns the new x cursor."""
+    if not humanize:
+        draw.text((x, top), run, fill=ink, font=font)
+        return x + font.getlength(run)
+    for ch in run:
+        adv = font.getlength(ch)
+        if ch.strip():
+            _draw_char(img, ch, font, x, top, _jitter_ink(ink, True))
+        x += adv
+    return x
+
+
 def draw_segments(img: Image.Image, draw: ImageDraw.ImageDraw, x: int,
                   baseline_y: float, segments: list[tuple[str, str]],
                   font_path: Path, size: int, ink: tuple, y_ratio: float,
@@ -326,8 +370,7 @@ def draw_segments(img: Image.Image, draw: ImageDraw.ImageDraw, x: int,
             top = baseline_y - (csize * y_ratio) + dy + jitter
             run_ink = _jitter_ink(ink, wobble)
             if path == font_path:
-                draw.text((x, top), run, fill=run_ink, font=f)
-                x += int(f.getlength(run))
+                x = int(_draw_run(img, draw, run, f, x, top, run_ink, wobble))
                 continue
             # Fallback run: prefer the user's own handwritten symbol scans.
             for ch in run:
@@ -462,6 +505,36 @@ def make_notebook_page(
     return img
 
 
+def apply_scan_look(img: Image.Image, seed: int | None = None) -> Image.Image:
+    """Make a clean render look like a phone/Adobe Scan capture of paper.
+
+    A perfectly axis-aligned, evenly-lit page is the giveaway even when the
+    writing is good, so: tiny rotation, uneven lighting, softness, grain.
+    """
+    rng = random.Random(seed)
+    w, h = img.size
+
+    angle = rng.uniform(-0.55, 0.55)
+    img = img.rotate(angle, resample=Image.BICUBIC, expand=False,
+                     fillcolor=(252, 250, 245))
+
+    arr = np.asarray(img).astype(np.float32)
+    # Lighting gradient: brighter on one side, slight corner falloff.
+    gx = np.linspace(rng.uniform(0.90, 0.99), rng.uniform(0.97, 1.03), w,
+                     dtype=np.float32)
+    gy = np.linspace(rng.uniform(0.95, 1.01), rng.uniform(0.90, 0.99), h,
+                     dtype=np.float32)
+    shade = np.outer(gy, gx)
+    yy, xx = np.mgrid[0:h, 0:w].astype(np.float32)
+    r = (((xx - w / 2) / (w / 2)) ** 2 + ((yy - h / 2) / (h / 2)) ** 2)
+    shade *= 1.0 - 0.055 * r
+    arr *= shade[..., None]
+
+    arr += np.random.normal(0, 2.1, arr.shape).astype(np.float32)
+    out = Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8))
+    return out.filter(ImageFilter.GaussianBlur(radius=0.45))
+
+
 def _jitter_ink(base_ink: tuple, wobble: bool = True) -> tuple:
     """Natural ink pressure variation."""
     if not wobble:
@@ -487,6 +560,7 @@ def render_assignment(
     ink_name: str = "blue",
     wobble: bool = True,
     title: str | None = None,
+    scan: bool = True,
 ) -> dict:
     """Render a full assignment to multi-page PNG images or PDF.
     
@@ -600,7 +674,11 @@ def render_assignment(
                 line_idx += 1
                 continue
             
+            # Real lines start a hair off the margin and slope a little.
             indent_px = MARGIN_LEFT + 25 + indent * 40
+            if wobble:
+                indent_px += int(random.uniform(-3, 4))
+            slope = random.uniform(-0.007, 0.005) if wobble else 0.0
             
             if kind == "header":
                 ink = _jitter_ink(base_ink, wobble)
@@ -628,6 +706,7 @@ def render_assignment(
                 display_word = word[2:-2] if is_underlined else word
 
                 wobble_y = random.uniform(-1.8, 1.8) if wobble else 0
+                wobble_y += slope * (x - indent_px)
                 start_x = x
                 x = draw_segments(
                     img, draw, x, baseline_y + wobble_y,
@@ -644,6 +723,9 @@ def render_assignment(
             current_y_slot += 1
             line_idx += 1
         
+        if scan:
+            img = apply_scan_look(img)
+
         # Save page
         if str(out_path).endswith(".pdf"):
             pages.append(img)
@@ -691,6 +773,8 @@ def main():
     ap.add_argument("--style", default="kalam", choices=list(STYLES.keys()))
     ap.add_argument("--ink", default="blue", choices=list(INKS.keys()))
     ap.add_argument("--no-wobble", action="store_true", help="Disable handwriting wobble")
+    ap.add_argument("--no-scan", action="store_true",
+                    help="Skip the scanned-paper look (flat digital render)")
     args = ap.parse_args()
     
     content = Path(args.input).read_text(encoding="utf-8")
@@ -699,6 +783,7 @@ def main():
         style_key=args.style,
         ink_name=args.ink,
         wobble=not args.no_wobble,
+        scan=not args.no_scan,
     )
     print(f"Done: {result['total_pages']} page(s) → {args.output}")
     print(f"Style: {result['style']}, Ink: {result['ink']}")
