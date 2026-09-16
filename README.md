@@ -65,10 +65,23 @@ Notebook front-ends for both environments:
 [`notebooks/02_hwt_finetune.ipynb`](notebooks/02_hwt_finetune.ipynb) ·
 [`notebooks/01_onedm_finetune.ipynb`](notebooks/01_onedm_finetune.ipynb).
 
+### Ruled assignment pages (CPU — current working path)
+
+For a multi-page homework PDF that *looks like* a student notebook (blue pen, Caveat,
+math markup). This is **not** cloning your hand. Details: [docs/ASSIGNMENT_PAGES.md](docs/ASSIGNMENT_PAGES.md), [AGENTS.md](AGENTS.md).
+
+```bash
+PYTHONPATH=src python src/textwritter/assignment_engine.py \
+  samples/assignment2_solutions.txt output/a2/Assignment2_solutions.pdf \
+  --style caveat --ink blue
+```
+
 ### Docs
 
 | Doc | What it's for |
 |---|---|
+| [AGENTS.md](AGENTS.md) | What future agents must not regress (joins, ruled lines, two pipelines) |
+| [docs/ASSIGNMENT_PAGES.md](docs/ASSIGNMENT_PAGES.md) | Assignment PDF how-to + markup + glyph sheet |
 | [docs/FEASIBILITY_PLAN.md](docs/FEASIBILITY_PLAN.md) | The master plan (locked) |
 | [docs/MODELS_GUIDE.md](docs/MODELS_GUIDE.md) | Fact-checked model comparison + accuracy |
 | [docs/COLAB_GUIDE.md](docs/COLAB_GUIDE.md) | Running/training on Colab **or** a GPU PC (same commands) |
@@ -84,10 +97,13 @@ Notebook front-ends for both environments:
 ├── assets/sample_styles/  # bundled handwriting samples (used when you pass no photo)
 ├── samples/               # drop your handwriting photo here
 └── src/textwritter/       # the product code
-    ├── runtime.py         #   environment + engine detection (Colab / GPU PC / CPU)
-    ├── pipeline.py        #   create() → generate → judge → compare
-    ├── quicktest.py       #   one-command creation CLI
-    └── agent/             #   LangGraph satisfaction loop + Gemini client
+    ├── runtime.py              #   environment + engine detection
+    ├── pipeline.py             #   create() → generate → judge → compare
+    ├── quicktest.py            #   one-command HWT/One-DM CLI
+    ├── assignment_engine.py  #   CPU ruled assignment pages + math
+    ├── glyphs.py              #   print/slice handwritten symbol sheet
+    ├── write_assignment.py    #   HWT multi-page (needs style PNG)
+    └── agent/                  #   LangGraph satisfaction loop + Gemini client
 ```
 
 ## Rules that keep this project fast
