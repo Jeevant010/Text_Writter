@@ -1,0 +1,809 @@
+# Q1.   Artificial neuron, pre-activation z = w^{T}x + b
+
+Given x = (2, -1, 3), w = (1, 2, -1), b = 1/2
+
+a) \to z = w^{T}x + b
+        = (1)(2) + (2)(-1) + (-1)(3) + 1/2
+        = 2 - 2 - 3 + 0.5
+   \to z = -2.5
+
+b) \to w^{T}x is a dot product of two vectors in R^{3},
+   so it is a single scalar.
+   \to dimension is 1, i.e. shape (1\times1)
+
+c) \to Identity activation: a = z
+   \to a = -2.5
+
+d) \to ReLU(z) = max(0, z) = max(0, -2.5)
+   \to a = 0
+
+e) \to \sigma(z) = 1/(1 + e^{-z}) = 1/(1 + e^{2.5})
+        = 1/(1 + 12.182)
+   \to \sigma(z) \approx 0.0759
+
+f) \to w decides how strongly each input feature counts
+   and fixes the orientation of the decision boundary.
+   \to b shifts the boundary away from the origin, so the
+   neuron can fire without needing x to be large.
+   \to The activation adds the nonlinearity (and can squash
+   the output into a range); without it the whole neuron
+   would only ever be an affine map.
+
+# Q2.   Affine map z = Wx + b
+
+Given W = [[1, 0, 2], [-1, 3, 1]], x = (2, 1, -1), b = (1, -2)
+
+a) \to Shapes:
+        W is 2\times3,  x is 3\times1,  b is 2\times1
+
+b) \to Wx :
+   row 1 = (1)(2) + (0)(1) + (2)(-1) = 2 + 0 - 2 = 0
+   row 2 = (-1)(2) + (3)(1) + (1)(-1) = -2 + 3 - 1 = 0
+   \to Wx = (0, 0)
+
+c) \to z = Wx + b = (0 + 1, 0 - 2)
+   \to z = (1, -2)
+
+d) \to z has shape 2\times1
+
+e) \to W contributes 2 \times 3 = 6 weights,
+   b contributes 2 biases.
+   \to Total scalar parameters = 6 + 2 = 8
+
+f) \to If x \in R^{5} and the output must stay in R^{2},
+   then W must map R^{5} \to R^{2}.
+   \to W must be of shape 2\times5 (and b stays 2\times1)
+
+# Q3.   Binary classifier, decision boundary
+
+Given w = (2, -1), b = -1.   Predict class 1 if w^{T}x + b > 0
+
+a) \to Boundary is where w^{T}x + b = 0
+        2x_1 - x_2 - 1 = 0
+   \to x_2 = 2x_1 - 1     (a straight line, slope 2, intercept -1)
+
+b) \to Evaluate f(x) = 2x_1 - x_2 - 1 at each point:
+   (0,0) : 0 - 0 - 1 = -1  < 0  \to class 0
+   (1,0) : 2 - 0 - 1 = +1  > 0  \to class 1
+   (1,1) : 2 - 1 - 1 =  0       \to not > 0, so class 0
+                                  (it lies exactly on the boundary)
+   (2,1) : 4 - 1 - 1 = +2  > 0  \to class 1
+   (0,2) : 0 - 2 - 1 = -3  < 0  \to class 0
+
+c) \to Class 1 is the half-plane where 2x_1 - x_2 - 1 > 0,
+   i.e. the side that the weight vector w = (2,-1) points
+   towards. That is the region below-right of the line.
+
+d) \to In R^{2} the condition w_1x_1 + w_2x_2 + b = 0 is one
+   linear equation in two unknowns. Its solution set has
+   dimension 2 - 1 = 1, and a 1-dimensional flat set in the
+   plane is exactly a straight line.
+
+e) \to In R^{d} the same single linear equation leaves a flat
+   set of dimension d - 1.
+   \to It is a hyperplane (a point in R^{1}, a line in R^{2},
+   a plane in R^{3}, and so on).
+
+# Q4.   Boolean AND
+
+a) \to Take w = (1, 1) and b = -1.5
+   (The line x_1 + x_2 = 1.5 passes between (1,1) and the
+   other three corners.)
+
+b) \to Verify with f(x) = x_1 + x_2 - 1.5 :
+   (0,0) : 0 + 0 - 1.5 = -1.5  < 0  \to y = 0  ✓
+   (0,1) : 0 + 1 - 1.5 = -0.5  < 0  \to y = 0  ✓
+   (1,0) : 1 + 0 - 1.5 = -0.5  < 0  \to y = 0  ✓
+   (1,1) : 1 + 1 - 1.5 = +0.5  > 0  \to y = 1  ✓
+   \to All four labels are reproduced correctly.
+
+c) \to Sketch: plot the unit square. Mark (0,0), (0,1), (1,0)
+   as open circles (y = 0) and (1,1) as a filled dot (y = 1).
+   Draw the line x_1 + x_2 = 1.5, which cuts the top-right
+   corner off. (1,1) sits alone above the line.
+
+d) \to Yes. We exhibited a single line with all y = 0 points
+   strictly on one side and the y = 1 point strictly on the
+   other, which is the definition of linear separability.
+
+e) \to For OR the only negative point is (0,0), so shift the
+   same line: w = (1, 1), b = -0.5
+   (0,0) : -0.5  < 0  \to y = 0  ✓
+   (0,1) : +0.5  > 0  \to y = 1  ✓
+   (1,0) : +0.5  > 0  \to y = 1  ✓
+   (1,1) : +1.5  > 0  \to y = 1  ✓
+   \to OR is linearly separable too.
+
+# Q5.   XOR is not linearly separable
+
+a) \to Each data point gives one inequality:
+   (0,0), y = 0  \to  b < 0
+   (1,0), y = 1  \to  w_1 + b > 0
+   (0,1), y = 1  \to  w_2 + b > 0
+   (1,1), y = 0  \to  w_1 + w_2 + b < 0
+
+b) \to Add the two "> 0" inequalities:
+        (w_1 + b) + (w_2 + b) > 0
+        w_1 + w_2 + 2b > 0
+        w_1 + w_2 + b > -b
+   Since b < 0 we have -b > 0, therefore
+        w_1 + w_2 + b > 0
+   But the fourth inequality demands w_1 + w_2 + b < 0.
+   \to Contradiction.
+
+c) \to No (w, b) can satisfy all four constraints at once,
+   so no affine function separates the XOR labels.
+   \to XOR is not linearly separable.
+
+d) \to The obstruction is in the hypothesis class, not in the
+   data. Extra samples of the same four patterns only repeat
+   the same four inequalities, and an inconsistent system
+   stays inconsistent no matter how often we restate it.
+
+e) \to A hidden layer with a nonlinearity re-represents the
+   input. For example h_1 = ReLU(x_1 + x_2 - 0.5) and
+   h_2 = ReLU(x_1 + x_2 - 1.5) turn the four corners into
+   points that a single line can split, because in the new
+   h-space (1,0) and (0,1) no longer sit between (0,0) and
+   (1,1). Composition of affine maps alone would not help
+   \to the nonlinearity is what makes the new space useful.
+
+# Q6.   Activation functions
+
+a) \to \sigma(0) = 1/(1 + e^{0}) = 1/2 = 0.5
+   \to tanh(0) = 0
+   \to ReLU(0) = max(0, 0) = 0
+   \to GELU(0) = 0 \cdot \Phi(0) = 0 \times 0.5 = 0
+
+b) \to ReLU(-3) = max(0, -3) = 0
+   \to LeakyReLU_{0.1}(-3) = 0.1 \times (-3) = -0.3
+
+c) \to Range of sigmoid is (0, 1)  (open at both ends)
+
+d) \to Range of tanh is (-1, 1)
+
+e) \to Bounded: sigmoid and tanh.
+   ReLU, LeakyReLU and GELU are unbounded above
+   (GELU is bounded below by roughly -0.17).
+
+f) \to ReLU. For z < 0 it is identically 0, so its derivative
+   is exactly 0 there \to those units get no gradient.
+
+g) \to Leaky ReLU keeps a nonzero slope \alpha for z < 0, so both
+   the value and the derivative survive. A negative
+   pre-activation still passes a scaled signal forward and a
+   nonzero gradient backward, which avoids dead units.
+
+h) \to GELU is smoother. ReLU has a kink at z = 0 where the
+   derivative jumps from 0 to 1; GELU is differentiable
+   everywhere and bends gradually through the origin.
+
+i) \to Sketch (qualitative):
+   \sigma : S-curve from 0 up to 1, crossing 0.5 at z = 0
+   tanh : same S-shape but from -1 to 1, through the origin
+   ReLU : flat on the negative axis, then the line y = z
+   LeakyReLU : gentle slope \alpha on the left, y = z on the right
+   GELU : hugs 0 for very negative z, dips slightly below 0
+          near z \approx -1, then rises smoothly toward y = z
+
+# Q7.   Softmax
+
+Given z = (0, ln 2, ln 4)
+
+a) \to e^{z_1} = e^{0} = 1
+   \to e^{z_2} = e^{ln 2} = 2
+   \to e^{z_3} = e^{ln 4} = 4
+
+b) \to Denominator = 1 + 2 + 4 = 7
+   \to softmax(z) = (1/7, 2/7, 4/7)
+   \approx (0.1429, 0.2857, 0.5714)
+
+c) \to 1/7 + 2/7 + 4/7 = 7/7 = 1  ✓
+   So it is a valid probability vector.
+
+d) \to Class 3, with probability 4/7 \approx 0.571
+   (largest logit ln 4 \to largest probability)
+
+e) \to z' = z + (5,5,5) = (5, 5 + ln 2, 5 + ln 4)
+   e^{z'_i} = e^{5} \cdot e^{z_i}, so
+   softmax(z')_i = (e^{5}e^{z_i}) / (e^{5}\Sigma e^{z_j})
+                = e^{z_i} / \Sigma e^{z_j}
+   \to softmax(z') = (1/7, 2/7, 4/7)   — unchanged.
+
+f) \to Softmax is shift-invariant: adding the same constant to
+   every logit cancels between numerator and denominator.
+   Only the differences between logits matter. This is also
+   why implementations subtract max(z) before exponentiating
+   \to it changes nothing mathematically but prevents overflow.
+
+# Q8.   Two-layer network, forward pass
+
+Given x = (1,-1), W^{(1)} = [[1,1],[2,-1]], b^{(1)} = (0,1),
+      W^{(2)} = [1  -2],  b^{(2)} = 1/2
+
+a) \to W^{(1)}x :
+   row 1 = (1)(1) + (1)(-1) = 0
+   row 2 = (2)(1) + (-1)(-1) = 2 + 1 = 3
+   so W^{(1)}x = (0, 3)
+   \to z^{(1)} = (0, 3) + (0, 1) = (0, 4)
+
+b) \to h = ReLU(z^{(1)}) = (max(0,0), max(0,4))
+   \to h = (0, 4)
+
+c) \to z^{(2)} = W^{(2)}h + b^{(2)}
+        = (1)(0) + (-2)(4) + 0.5
+        = 0 - 8 + 0.5
+   \to z^{(2)} = -7.5
+
+d) \to Shapes:
+   x : 2\times1        W^{(1)} : 2\times2      b^{(1)} : 2\times1
+   z^{(1)} : 2\times1  h : 2\times1
+   W^{(2)} : 1\times2  b^{(2)} : 1\times1  z^{(2)} : 1\times1
+
+e) \to Only the ReLU step h = ReLU(z^{(1)}) is nonlinear.
+   Both W^{(1)}x + b^{(1)} and W^{(2)}h + b^{(2)} are affine.
+
+f) \to With identity activations the map becomes
+   z^{(2)} = W^{(2)}(W^{(1)}x + b^{(1)}) + b^{(2)}
+           = (W^{(2)}W^{(1)})x + (W^{(2)}b^{(1)} + b^{(2)})
+   which is again a single affine map W'x + b'.
+   \to The depth buys nothing; the network collapses to one
+   affine layer and can never represent anything a single
+   layer could not.
+
+# Q9.   MLP 10 \to 6 \to 4 \to 2
+
+a) \to Three arrows, so three affine layers.
+   \to Depth = 3
+
+b) \to Hidden widths are 6 and 4
+
+c) \to Maximum hidden width = 6
+
+d) \to Weight matrices (each maps input dim \to output dim):
+   W^{(1)} : 6\times10
+   W^{(2)} : 4\times6
+   W^{(3)} : 2\times4
+
+e) \to Bias vectors:
+   b^{(1)} : 6\times1,   b^{(2)} : 4\times1,   b^{(3)} : 2\times1
+
+f) \to Weights = (6\times10) + (4\times6) + (2\times4)
+        = 60 + 24 + 8
+   \to 92 weights
+
+g) \to Biases = 6 + 4 + 2 = 12
+
+h) \to Total trainable scalars = 92 + 12
+   \to 104 parameters
+
+i) \to Depth is how many affine layers are stacked, i.e. how
+   many times the input is re-represented.
+   \to Width is how many units sit inside one layer, i.e. how
+   many features that layer can carry at once.
+   \to Parameter count is the total number of learnable
+   scalars, and it depends on both: it grows roughly with
+   (width)^{2} per layer and linearly with depth. Two networks
+   can share a parameter count while being deep-and-thin or
+   shallow-and-wide, which behave very differently.
+
+# Q10.   ReLU as a piecewise-linear building block
+
+a) \to Case x \geq 0 : ReLU(x) = x, ReLU(-x) = 0
+        sum = x + 0 = x = |x|   ✓
+   \to Case x < 0 : ReLU(x) = 0, ReLU(-x) = -x
+        sum = 0 + (-x) = -x = |x|  ✓
+   \to Both cases agree, so |x| = ReLU(x) + ReLU(-x)
+
+b) \to Read it as a 1 \to 2 \to 1 network with no biases.
+   Hidden weights are +1 and -1, giving pre-activations x
+   and -x. Apply ReLU to each, then combine with output
+   weights (1, 1). So |x| is exactly a two-neuron ReLU net.
+
+c) \to f(x) = ReLU(x+1) - 2ReLU(x) + ReLU(x-1)
+   For x < -1 : all three arguments negative
+        f = 0 - 0 + 0 = 0
+   For -1 \leq x < 0 : only (x+1) is \geq 0
+        f = (x+1) - 0 + 0 = x + 1
+   For 0 \leq x < 1 : (x+1) and x are \geq 0
+        f = (x+1) - 2x + 0 = 1 - x
+   For x \geq 1 : all three active
+        f = (x+1) - 2x + (x-1) = 0
+   \to f is a triangular bump, zero outside [-1, 1]
+
+d) \to Sketch: flat along the axis until x = -1, rise on a
+   slope of +1 to the peak f(0) = 1, fall on a slope of -1
+   back to zero at x = 1, then flat again. A hat/tent shape.
+
+e) \to Every ReLU(x - c) contributes one breakpoint at x = c
+   and adds a fixed amount to the slope beyond it. Summing
+   several of them with different shifts c and different
+   output weights lets us place kinks wherever we like and
+   choose the slope change at each kink. So a one-hidden-layer
+   ReLU network is a piecewise-linear function whose number of
+   slope changes is controlled by the number of neurons \to
+   which is the intuition behind universal approximation.
+
+# Q11.   Universal approximation
+
+a) \to It means: for every tolerance \epsilon > 0 there exists some
+   network in the family whose error stays below \epsilon over the
+   whole compact domain, e.g. sup |f(x) - g(x)| < \epsilon. The
+   error can be pushed as close to zero as we wish, but we
+   may need a different (larger) network for each \epsilon.
+
+b) \to No. It is an approximation statement, not a
+   representation statement. A fixed small network generally
+   cannot reproduce a target function exactly; the width may
+   have to grow without bound as \epsilon \to 0.
+
+c) \to No. The theorem is non-constructive. It asserts that a
+   sufficient width exists but gives no formula relating the
+   number of neurons to a required accuracy.
+
+d) \to No. It is purely about existence in the function class.
+   It says nothing about the loss surface, initialisation, or
+   whether gradient descent will actually reach that good set
+   of weights. Optimisation is a separate problem.
+
+e) \to Without a nonlinearity every layer is affine, and a
+   composition of affine maps is affine. The whole network
+   would only represent functions of the form Wx + b, which
+   cannot approximate, say, x^{2} or sin x on an interval. The
+   nonlinearity is what makes the family rich.
+
+f) \to Because "possible" is not "practical". A shallow net may
+   need exponentially many neurons where a deep one needs
+   only a few, since depth composes and reuses features
+   instead of enumerating them. Deeper models also tend to
+   generalise better on structured data (images, text) and
+   are often easier to optimise per parameter.
+
+g) \to Existence of a representation says some weight setting
+   in the class realises the target. Ease of learning asks
+   whether our training procedure, from a random start and
+   with finite data and time, will find such a setting.
+   Universal approximation only delivers the first. The gap
+   between the two is precisely where optimisation and
+   generalisation live.
+
+# Q12.   Linear regression, one gradient step
+
+Data (0,1), (1,3), (2,5).   Model ŷ = wx + b,  w = 1, b = 0
+
+a) \to ŷ_1 = (1)(0) + 0 = 0
+   \to ŷ_2 = (1)(1) + 0 = 1
+   \to ŷ_3 = (1)(2) + 0 = 2
+
+b) \to Errors e_i = ŷ_i - y_i :
+   e_1 = 0 - 1 = -1
+   e_2 = 1 - 3 = -2
+   e_3 = 2 - 5 = -3
+
+c) \to L = (1/3)\Sigma e_i^{2} = (1/3)(1 + 4 + 9) = 14/3
+   \to L \approx 4.667
+
+d) \to L(w,b) = (1/3)\Sigma (wx_i + b - y_i)^{2}
+   \partial L/\partial w = (1/3)\Sigma 2(wx_i + b - y_i)(x_i)
+   \to \partial L/\partial w = (2/3)\Sigma e_i x_i
+
+e) \to \partial L/\partial b = (1/3)\Sigma 2(wx_i + b - y_i)(1)
+   \to \partial L/\partial b = (2/3)\Sigma e_i
+
+f) \to At w = 1, b = 0 :
+   \Sigma e_i x_i = (-1)(0) + (-2)(1) + (-3)(2) = 0 - 2 - 6 = -8
+   \partial L/\partial w = (2/3)(-8) = -16/3 \approx -5.333
+   \Sigma e_i = -1 - 2 - 3 = -6
+   \partial L/\partial b = (2/3)(-6) = -4
+
+g) \to Update with \eta = 0.1 :
+   w_new = w - \eta(\partial L/\partial w) = 1 - 0.1(-16/3)
+         = 1 + 1.6/3 = 1 + 0.5333
+   \to w_new \approx 1.5333
+   b_new = b - \eta(\partial L/\partial b) = 0 - 0.1(-4)
+   \to b_new = 0.4
+   (Both moved upward, as expected: every prediction was
+   too small, so the errors were all negative.)
+
+# Q13.   Binary cross-entropy
+
+Given y = (1, 0, 1),  p = (0.8, 0.25, 0.6)
+
+a) \to Example 1 (y=1) : \ell = -ln(0.8) = 0.2231
+   \to Example 2 (y=0) : \ell = -ln(1 - 0.25) = -ln(0.75) = 0.2877
+   \to Example 3 (y=1) : \ell = -ln(0.6) = 0.5108
+
+b) \to Average = (0.2231 + 0.2877 + 0.5108)/3
+        = 1.0216/3
+   \to BCE \approx 0.3405
+
+c) \to For y = 1 the second term vanishes:
+   \ell = -[1 \cdot ln p + 0 \cdot ln(1-p)]
+   \to \ell = -ln p
+
+d) \to For y = 0 the first term vanishes:
+   \ell = -[0 + 1 \cdot ln(1-p)]
+   \to \ell = -ln(1 - p)
+
+e) \to y = 1 and p \to 0 gives \ell = -ln p \to +\infty
+   The loss blows up without bound.
+
+f) \to y = 0 and p \to 1 gives \ell = -ln(1-p) \to +\infty
+   Same divergence on the other side.
+
+g) \to Being confidently wrong means putting probability near
+   zero on the event that actually happened, and -ln of a
+   number near zero grows without bound. So BCE charges an
+   unbounded price for certainty in the wrong direction,
+   while a merely hesitant wrong answer (p \approx 0.5) costs only
+   about ln 2 \approx 0.693. The gradient \partial\ell/\partial z = p - y is also
+   largest exactly in that confidently-wrong regime, which
+   pushes the model hard away from such predictions.
+
+# Q14.   Categorical cross-entropy
+
+Given z = (0, ln 2, ln 4),  true class = 2
+
+a) \to e^{z} = (1, 2, 4), sum = 7
+   \to p = (1/7, 2/7, 4/7) \approx (0.1429, 0.2857, 0.5714)
+
+b) \to One-hot target for class 2:
+   \to y = (0, 1, 0)
+
+c) \to L = -\Sigma y_i ln p_i
+        = -[0 \cdot ln(1/7) + 1 \cdot ln(2/7) + 0 \cdot ln(4/7)]
+        = -ln(2/7) = ln(7/2) = ln 3.5
+   \to L \approx 1.2528
+
+d) \to Let the true class be index t, so y_t = 1 and y_i = 0
+   for all i \neq t. Then every term of the sum with i \neq t is
+   multiplied by 0 and disappears:
+   L = -\Sigma_i y_i ln p_i = -(1) ln p_t
+   \to L = -ln p_{true class}
+   Only the probability assigned to the correct class enters
+   the loss.
+
+e) \to Increasing the logit of the true class. Since
+   \partial L/\partial z = p - y, the true-class component is
+   p_2 - 1 = 0.2857 - 1 = -0.714 < 0, so gradient descent
+   raises z_2. Decreasing it would move uphill and enlarge
+   the loss.
+
+f) \to If p_{true} = 1 then L = -ln 1 = 0
+   \to zero loss, the ideal case (attained only in the limit,
+   since softmax outputs are strictly less than 1).
+
+# Q15.   Maximum likelihood \to binary cross-entropy
+
+a) \to Independence lets the joint factorise:
+   L = \prod_{i=1}^{N} P(y_i | p_i)
+   \to L = \prod_{i=1}^{N} p_i^{y_i}(1 - p_i)^{1 - y_i}
+
+b) \to Take logs; the product becomes a sum and exponents
+   become multipliers:
+   ln L = \Sigma_{i=1}^{N} [y_i ln p_i + (1 - y_i) ln(1 - p_i)]
+
+c) \to Multiply by -1 :
+   -ln L = -\Sigma_{i=1}^{N} [y_i ln p_i + (1 - y_i) ln(1 - p_i)]
+   This is the negative log-likelihood (NLL).
+
+d) \to The per-example binary cross-entropy is
+   \ell(y_i, p_i) = -[y_i ln p_i + (1 - y_i) ln(1 - p_i)]
+   so the expression in (c) is literally
+   -ln L = \Sigma_{i=1}^{N} \ell(y_i, p_i) = N \cdot BCE_{mean}
+   \to NLL and total BCE are the same function, and the mean
+   BCE differs only by the positive constant 1/N, which does
+   not move the minimiser.
+
+e) \to -ln is a strictly decreasing function, so it reverses
+   order without creating or destroying extrema:
+   L_1 > L_2  \iff  -ln L_1 < -ln L_2
+   Hence argmax_\theta L = argmin_\theta (-ln L). The same parameters
+   solve both problems. We prefer the minimisation form
+   because optimisers are written as minimisers.
+
+f) \to A product of N probabilities, each < 1, underflows to 0
+   in floating point once N is large (0.1^{400} is already 0
+   in double precision). The log turns it into a sum of
+   moderate negative numbers, which is numerically stable.
+   Sums also differentiate term by term, so gradients
+   decompose per example \to that is what makes mini-batch
+   SGD possible in the first place.
+
+# Q16.   Categorical likelihood \to categorical cross-entropy
+
+a) \to With y one-hot, exactly one y_k equals 1 and the rest
+   are 0, so p_k^{y_k} equals p_k for the true class and
+   p_k^{0} = 1 for all others. The product therefore picks
+   out the correct probability:
+   \to P(y | p) = \prod_{k=1}^{K} p_k^{y_k}
+
+b) \to -ln P(y | p) = -ln \prod_k p_k^{y_k}
+                    = -\Sigma_k ln(p_k^{y_k})
+
+c) \to Using ln(a^{c}) = c ln a on each factor:
+   -\Sigma_k ln(p_k^{y_k}) = -\Sigma_{k=1}^{K} y_k ln p_k
+   \to -ln P(y | p) = -\Sigma_{k=1}^{K} y_k ln p_k   ✓
+
+d) \to That expression is the definition of categorical
+   cross-entropy H(y, p) between the target distribution y
+   and the predicted distribution p. Here y happens to be a
+   degenerate (one-hot) distribution, so the sum collapses to
+   -ln p_{true} \to the familiar form.
+
+e) \to Training a softmax classifier with categorical
+   cross-entropy is exactly maximum likelihood estimation for
+   a categorical observation model. The softmax layer supplies
+   a valid distribution p_\theta(\cdot | x), the label supplies the
+   observed outcome, and minimising \Sigma -ln p_\theta(y | x) over the
+   dataset maximises the probability the model assigns to the
+   data it actually saw. So the loss is not an arbitrary
+   choice \to it is the negative log-likelihood of the model.
+
+# Q17.   Multi-class vs multi-label
+
+a) \to Handwritten digit as one of 0…9
+   several labels at once? No — a digit is one symbol
+   output layer : one softmax over 10 classes
+   loss : categorical cross-entropy
+   \to Multi-class
+
+b) \to Photograph containing car / pedestrian / bicycle /
+   traffic light
+   several labels at once? Yes — a street scene can hold all
+   four simultaneously
+   output layer : 4 independent sigmoids
+   loss : binary cross-entropy (summed over the 4 outputs)
+   \to Multi-label
+
+c) \to Student's blood group
+   several labels at once? No — a person has one blood group
+   output layer : one softmax over the 8 groups
+   loss : categorical cross-entropy
+   \to Multi-class
+
+d) \to Tagging a news article (politics, economics,
+   technology, international affairs)
+   several labels at once? Yes — an article on chip export
+   rules is all four
+   output layer : independent sigmoids, one per topic
+   loss : binary cross-entropy
+   \to Multi-label
+
+e) \to Animal image as exactly one of cat / dog / bird
+   several labels at once? No — the word "exactly" forbids it
+   output layer : one softmax over 3 classes
+   loss : categorical cross-entropy
+   \to Multi-class
+
+\to Why one softmax is wrong for a genuinely multi-label task:
+   Softmax enforces \Sigma_k p_k = 1, so the outputs compete. Raising
+   the score for "car" must lower the score for "pedestrian",
+   even when both objects are plainly present. The model can
+   never say "car: 0.95 and pedestrian: 0.95"; it is forced to
+   split one unit of probability among labels that are not
+   mutually exclusive. Independent sigmoids remove that
+   coupling — each output estimates P(label k present | x) on
+   its own, so any subset of labels, including all of them or
+   none of them, is representable.
+
+# Q18.   Backpropagation through a single sigmoid unit
+
+Graph: x \to z = wx + b \to a = \sigma(z) \to L = (1/2)(a - y)^{2}
+
+a) \to L = (1/2)(a - y)^{2}
+   \to \partial L/\partial a = (a - y)
+
+b) \to a = \sigma(z), and \sigma'(z) = \sigma(z)(1 - \sigma(z))
+   \to \partial a/\partial z = a(1 - a)
+
+c) \to z = wx + b is affine in each argument:
+   \partial z/\partial w = x
+   \partial z/\partial b = 1
+   \partial z/\partial x = w
+
+d) \to Chain rule along the path L \to a \to z \to w :
+   \partial L/\partial w = (\partial L/\partial a)(\partial a/\partial z)(\partial z/\partial w)
+   \to \partial L/\partial w = (a - y) \cdot a(1 - a) \cdot x
+
+e) \to Same first two factors, different last one:
+   \partial L/\partial b = (a - y) \cdot a(1 - a) \cdot 1
+   \to \partial L/\partial b = (a - y)a(1 - a)
+   \partial L/\partial x = (a - y) \cdot a(1 - a) \cdot w
+   It is convenient to name \delta = \partial L/\partial z = (a - y)a(1-a)
+   and then write \partial L/\partial w = \delta x, \partial L/\partial b = \delta,
+   \partial L/\partial x = \delta w.
+
+f) \to Forward pass with x = 2, w = 1, b = 0, y = 1 :
+   z = (1)(2) + 0 = 2
+   a = \sigma(2) = 1/(1 + e^{-2}) = 1/1.1353 = 0.8808
+   L = (1/2)(0.8808 - 1)^{2} = (1/2)(0.01419)
+   \to L \approx 0.00709
+   \to Backward pass :
+   a - y = 0.8808 - 1 = -0.1192
+   a(1 - a) = 0.8808 \times 0.1192 = 0.1050
+   \delta = \partial L/\partial z = (-0.1192)(0.1050) = -0.01252
+   \partial L/\partial w = \delta x = (-0.01252)(2) \approx -0.02503
+   \partial L/\partial b = \delta \approx -0.01252
+   \partial L/\partial x = \delta w = (-0.01252)(1) \approx -0.01252
+   (All negative \to gradient descent increases w and b, which
+   pushes a up toward the target y = 1. Sensible.)
+
+# Q19.   Gradient of BCE through a sigmoid
+
+Given z = w^{T}x + b,  p = \sigma(z),
+      L = -[y ln p + (1-y) ln(1-p)]
+
+a) \to Differentiate term by term in p :
+   \partial L/\partial p = -[y/p - (1-y)/(1-p)]
+   Put over a common denominator p(1-p) :
+   = -[y(1-p) - (1-y)p] / [p(1-p)]
+   = -[y - yp - p + yp] / [p(1-p)]
+   = -(y - p) / [p(1-p)]
+   \to \partial L/\partial p = (p - y) / [p(1-p)]
+
+b) \to p = (1 + e^{-z})^{-1}, so by the quotient/chain rule
+   dp/dz = e^{-z} / (1 + e^{-z})^{2}
+         = [1/(1+e^{-z})] \cdot [e^{-z}/(1+e^{-z})]
+   The first bracket is p. For the second, note
+   e^{-z}/(1+e^{-z}) = (1 + e^{-z} - 1)/(1 + e^{-z}) = 1 - p
+   \to dp/dz = p(1 - p)   ✓
+
+c) \to Multiply (a) and (b) :
+   \partial L/\partial z = (\partial L/\partial p)(dp/dz)
+        = [(p - y)/(p(1-p))] \cdot p(1-p)
+   The p(1-p) factors cancel exactly.
+   \to \partial L/\partial z = p - y   ✓
+   (This cancellation is the reason sigmoid + BCE trains well
+   while sigmoid + squared error saturates: the p(1-p) factor
+   that kills the gradient is removed.)
+
+d) \to z = w^{T}x + b gives \partial z/\partial w = x, so
+   \nabla_w L = (\partial L/\partial z) \cdot \partial z/\partial w
+   \to \nabla_w L = (p - y)x
+   Shape check: (p - y) is a scalar, x is d\times1, so \nabla_w L is
+   d\times1 — same shape as w.  ✓
+
+e) \to \partial z/\partial b = 1, therefore
+   \partial L/\partial b = (\partial L/\partial z)(1)
+   \to \partial L/\partial b = p - y
+
+f) \to With x = (1, 2), w = (0, 0), b = 0, y = 1 :
+   z = (0)(1) + (0)(2) + 0 = 0
+   p = \sigma(0) = 0.5
+   p - y = 0.5 - 1 = -0.5
+   \nabla_w L = (p - y)x = -0.5(1, 2)
+   \to \nabla_w L = (-0.5, -1)
+   \to \partial L/\partial b = p - y = -0.5
+   (Loss here is -ln 0.5 = 0.693, the "no information" value,
+   and both gradients are negative, so the step raises w and b
+   and pushes p above 0.5 toward the label y = 1.)
+
+# Q20.   Full forward and backward pass
+
+Given x = (1,2), W^{(1)} = [[1,0],[-1,1]], w^{(2)} = (2,-1), y = 0
+      z^{(1)} = W^{(1)}x,  h = ReLU(z^{(1)}),
+      ŷ = (w^{(2)})^{T}h,  L = (1/2)(ŷ - y)^{2}
+
+a) \to Forward pass:
+   z^{(1)} row 1 = (1)(1) + (0)(2) = 1
+   z^{(1)} row 2 = (-1)(1) + (1)(2) = -1 + 2 = 1
+   \to z^{(1)} = (1, 1)
+   \to h = ReLU((1,1)) = (1, 1)
+   \to ŷ = (2)(1) + (-1)(1) = 2 - 1 = 1
+   \to L = (1/2)(1 - 0)^{2} = 1/2 = 0.5
+
+b) \to L = (1/2)(ŷ - y)^{2}
+   \partial L/\partial ŷ = ŷ - y = 1 - 0
+   \to \partial L/\partial ŷ = 1
+
+c) \to ŷ = (w^{(2)})^{T}h, so \partial ŷ/\partial w^{(2)} = h
+   \nabla_{w^{(2)}} L = (\partial L/\partial ŷ) h = (1)(1, 1)
+   \to \nabla_{w^{(2)}} L = (1, 1)
+
+d) \to \partial ŷ/\partial h = w^{(2)}, so
+   \partial L/\partial h = (\partial L/\partial ŷ) w^{(2)} = (1)(2, -1)
+   \to \partial L/\partial h = (2, -1)
+
+e) \to ReLU'(t) = 1 for t > 0 and 0 for t < 0.
+   Both components of z^{(1)} equal 1 > 0, so
+   \to ReLU'(z^{(1)}) = (1, 1)
+   (No unit is in the dead region here, so nothing is
+   blocked on the way back.)
+
+f) \to Elementwise (Hadamard) product:
+   \partial L/\partial z^{(1)} = (\partial L/\partial h) \odot ReLU'(z^{(1)})
+        = (2, -1) \odot (1, 1)
+   \to \partial L/\partial z^{(1)} = (2, -1)
+
+g) \to z^{(1)} = W^{(1)}x, so the gradient is an outer product:
+   \nabla_{W^{(1)}} L = (\partial L/\partial z^{(1)}) x^{T}
+        = (2, -1)^{T} (1, 2)
+   \to \nabla_{W^{(1)}} L = [[2, 4], [-1, -2]]
+
+h) \to \partial L/\partial x = (W^{(1)})^{T} (\partial L/\partial z^{(1)})
+   (W^{(1)})^{T} = [[1, -1], [0, 1]]
+   row 1 = (1)(2) + (-1)(-1) = 2 + 1 = 3
+   row 2 = (0)(2) + (1)(-1) = -1
+   \to \partial L/\partial x = (3, -1)
+
+i) \to Shape audit — each gradient must match its quantity:
+   \nabla_{w^{(2)}} L is 2\times1,  w^{(2)} is 2\times1   ✓
+   \partial L/\partial h is 2\times1,  h is 2\times1   ✓
+   \partial L/\partial z^{(1)} is 2\times1,  z^{(1)} is 2\times1   ✓
+   \nabla_{W^{(1)}} L is 2\times2,  W^{(1)} is 2\times2   ✓
+   \partial L/\partial x is 2\times1,  x is 2\times1   ✓
+   \partial L/\partial ŷ is a scalar,  ŷ is a scalar   ✓
+   \to Every gradient has the shape of the object it is taken
+   with respect to, which is exactly what lets us write the
+   update \theta \leftarrow \theta - \eta\nabla_\theta L elementwise.
+
+# Q21.   Softmax + cross-entropy gradient
+
+a) \to p_i = e^{z_i} / S  where S = \Sigma_j e^{z_j}
+   Differentiate w.r.t. z_i (both numerator and S depend on it):
+   \partial p_i/\partial z_i = [e^{z_i}S - e^{z_i} \cdot e^{z_i}] / S^{2}
+        = (e^{z_i}/S) - (e^{z_i}/S)^{2}
+        = p_i - p_i^{2}
+   \to \partial p_i/\partial z_i = p_i(1 - p_i)   ✓
+
+b) \to For i \neq j the numerator e^{z_i} does not depend on z_j,
+   only S does, and \partial S/\partial z_j = e^{z_j} :
+   \partial p_i/\partial z_j = -e^{z_i} \cdot e^{z_j} / S^{2}
+        = -(e^{z_i}/S)(e^{z_j}/S)
+   \to \partial p_i/\partial z_j = -p_i p_j   ✓
+   (Both cases combine as \partial p_i/\partial z_j = p_i(\delta_{ij} - p_j).)
+
+c) \to L = -\Sigma_i y_i ln p_i, so \partial L/\partial p_i = -y_i/p_i. Then
+   \partial L/\partial z_j = \Sigma_i (\partial L/\partial p_i)(\partial p_i/\partial z_j)
+        = \Sigma_i (-y_i/p_i) \cdot p_i(\delta_{ij} - p_j)
+        = -\Sigma_i y_i(\delta_{ij} - p_j)
+        = -y_j + p_j \Sigma_i y_i
+   Since y is one-hot, \Sigma_i y_i = 1, giving
+   \partial L/\partial z_j = p_j - y_j
+   \to \partial L/\partial z = p - y   ✓
+   Remarkably simple: the messy Jacobian cancels against the
+   1/p_i from the log.
+
+d) \to With z = Wx + b, the row W_{k\cdot} only affects z_k, and
+   \partial z_k/\partial W_{kj} = x_j. Writing \delta = \partial L/\partial z = p - y :
+   \partial L/\partial W_{kj} = \delta_k x_j
+   Collecting all (k, j) entries is an outer product:
+   \to \nabla_W L = (p - y)x^{T}
+   Shape check: (p-y) is K\times1, x^{T} is 1\times d, product is
+   K\times d = shape of W.  ✓
+
+e) \to \partial z_k/\partial b_k = 1 and b_k affects no other logit, so
+   \to \nabla_b L = \delta = p - y
+   (shape K\times1, matching b)  ✓
+
+f) \to K = 3, x = (1, -1), W = 0 (3\times2), b = 0, true class 2
+   z = Wx + b = (0, 0, 0)
+   e^{z} = (1, 1, 1), sum = 3
+   \to p = (1/3, 1/3, 1/3)
+   \to y = (0, 1, 0)
+   \to \partial L/\partial z = p - y
+        = (1/3 - 0, 1/3 - 1, 1/3 - 0)
+        = (1/3, -2/3, 1/3)
+   \to \nabla_W L = (p - y)x^{T} = (1/3, -2/3, 1/3)^{T}(1, -1)
+        = [[1/3, -1/3], [-2/3, 2/3], [1/3, -1/3]]
+   \to \nabla_b L = p - y = (1/3, -2/3, 1/3)
+   (Check: L = -ln(1/3) = ln 3 \approx 1.0986, the maximum-entropy
+   loss for K = 3, as expected from zero weights.)
+
+g) \to Signs of \partial L/\partial z = (1/3, -2/3, 1/3) :
+   \to Component 2 is negative. The update z \leftarrow z - \eta(p - y)
+   therefore increases z_2 \to the logit of the true class
+   should go up.
+   \to Components 1 and 3 are positive, so the same update
+   decreases z_1 and z_3 \to the logits of the wrong classes
+   should go down.
+   \to Interpretation: the gradient p - y is simply
+   "predicted minus observed". Wherever the model spends
+   probability it should not have, the logit is pushed down;
+   the class that actually occurred is pushed up. The
+   magnitudes also show the true class is corrected twice as
+   hard (2/3 against 1/3), because it carries the full
+   shortfall 1 - p_2 while each wrong class only carries its
+   own excess p_k. Note also that the components sum to zero,
+   so softmax's normalisation is preserved.
