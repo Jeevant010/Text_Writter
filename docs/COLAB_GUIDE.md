@@ -68,3 +68,19 @@ copy of anything in `/content` — it evaporates.
    need these flows — they're insurance.
 2. **IAM dataset license** is research-only and requires registration. Fine-tuning on
    *your own* pages (what these flows do) avoids redistributing anything.
+
+## Assignment PDF without a GPU (recommended for homework pages)
+
+Do **not** use One-DM / `quicktest.py` for a 20-page math assignment on Colab free
+tier. Use the CPU notebook renderer (same command as on a laptop):
+
+```bash
+PYTHONPATH=src python src/textwritter/assignment_engine.py \
+  samples/assignment2_solutions.txt \
+  output/a2/Assignment2_solutions.pdf \
+  --style caveat --ink blue
+```
+
+Markup, glyph sheet, and what this is *not*: [ASSIGNMENT_PAGES.md](ASSIGNMENT_PAGES.md).
+The HWT multi-page notebook is `notebooks/03_assignment_pages.ipynb` and needs a
+style PNG of English writing.
