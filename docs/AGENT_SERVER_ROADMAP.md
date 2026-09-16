@@ -62,6 +62,8 @@ draft ──► render ──► judge ──┬─ CER>15% & tries<3 ─► aut
 
 ## 5. Priority order (don't waste time on smaller things)
 
+0. **Assignment pages (CPU):** `assignment_engine.py` — [ASSIGNMENT_PAGES.md](ASSIGNMENT_PAGES.md).
+   Working path for a full homework PDF. Cursive font, not cloning.
 1. **Run `notebooks/00_quick_test.ipynb`** (Colab or local — it clones this repo) or
    `python src/textwritter/quicktest.py` — see YOUR handwriting today. This is the
    single most validating step. The engine auto-picks One-DM on a GPU, HWT elsewhere.
