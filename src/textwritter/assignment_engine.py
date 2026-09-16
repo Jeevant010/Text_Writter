@@ -9,8 +9,10 @@ Produces convincing handwritten assignment pages on ruled notebook paper with:
   - Natural handwriting variations (baseline wobble, ink pressure, spacing jitter)
 
 Usage:
-    python assignment_engine.py content.txt output.pdf
-    python assignment_engine.py content.txt output.pdf --style kalam --ink blue
+    PYTHONPATH=src python assignment_engine.py content.txt output.pdf --style caveat --ink blue
+
+Draw whole words (Caveat ligatures). Sit baselines on the ruled grid.
+See AGENTS.md and docs/ASSIGNMENT_PAGES.md.
 """
 from __future__ import annotations
 
@@ -135,11 +137,36 @@ def _coverage(path: str) -> frozenset[int] | None:
         return None
 
 
+@lru_cache(maxsize=4096)
+def _pil_has_glyph(path_str: str, ch: str) -> bool:
+    """Ask FreeType directly: does this face draw `ch`, or its .notdef box?
+
+    Used when fontTools is unavailable (common on a bare Colab runtime).
+    U+FFFF is a non-character, so its mask is whatever the face shows for
+    "missing" — anything that matches it is missing too.
+    """
+    def bitmap(font, text: str) -> bytes:
+        img = Image.new("L", (96, 96), 0)
+        ImageDraw.Draw(img).text((8, 8), text, fill=255, font=font)
+        return img.tobytes()
+
+    try:
+        f = _load_font(path_str, 40)
+        ref = bitmap(f, "\uffff")
+        got = bitmap(f, ch)
+    except Exception:  # noqa: BLE001 - odd font, assume it works
+        return True
+    blank = bytes(96 * 96)
+    return got != ref and got != blank
+
+
 def _covers(path: Path | None, ch: str) -> bool:
     if path is None:
         return False
     cov = _coverage(str(path))
-    return True if cov is None else ord(ch) in cov
+    if cov is not None:
+        return ord(ch) in cov
+    return _pil_has_glyph(str(path), ch)
 
 
 @lru_cache(maxsize=64)
@@ -147,13 +174,21 @@ def _load_font(path_str: str, size: int) -> ImageFont.FreeTypeFont:
     return ImageFont.truetype(path_str, size)
 
 
+# Caveat's cursive capital L is a bare loop that reads as an opening bracket, so
+# `∂L/∂w` looks like `∂(/∂w`. Draw those few letters from the fallback face.
+CONFUSABLE = {"Caveat.ttf": set("L")}
+
+
 def glyph_runs(text: str, primary: Path) -> list[tuple[str, Path]]:
     """Split text into runs, each drawn by a font that owns those glyphs."""
     fb = fallback_font_path()
+    swap = CONFUSABLE.get(primary.name, frozenset())
     runs: list[tuple[str, Path]] = []
     for ch in text:
         use = primary
-        if ch.strip() and not _covers(primary, ch) and _covers(fb, ch):
+        if ch in swap and _covers(fb, ch):
+            use = fb  # type: ignore[assignment]
+        elif ch.strip() and not _covers(primary, ch) and _covers(fb, ch):
             use = fb  # type: ignore[assignment]
         if runs and runs[-1][1] == use:
             runs[-1] = (runs[-1][0] + ch, use)
@@ -164,7 +199,6 @@ def glyph_runs(text: str, primary: Path) -> list[tuple[str, Path]]:
 
 # Superscripts/subscripts are drawn as smaller raised/lowered text rather than
 # mapped to Unicode ⁵/ₖ characters — handwriting faces don't have those.
-_SEG_RE = re.compile(r"\^\{([^}]*)\}|\^(\S)|_\{([^}]*)\}|_(\S)")
 SUP_SCALE = 0.62
 SUP_RISE = 0.42
 SUB_DROP = 0.16
@@ -191,32 +225,64 @@ def split_words(text: str) -> list[str]:
     return out
 
 
+def _group_at(text: str, i: int) -> tuple[str, int]:
+    """Read the argument of a `^`/`_` starting at `i`; returns (body, next index).
+
+    `{...}` is read with brace counting so `w^{(2)}` survives inside another
+    group; anything else takes just the one character.
+    """
+    if i < len(text) and text[i] == "{":
+        depth, j = 0, i
+        while j < len(text):
+            if text[j] == "{":
+                depth += 1
+            elif text[j] == "}":
+                depth -= 1
+                if depth == 0:
+                    return text[i + 1:j], j + 1
+            j += 1
+        return text[i + 1:], len(text)  # unbalanced; take the rest
+    if i < len(text):
+        return text[i], i + 1
+    return "", i
+
+
 def _flatten_markup(text: str) -> str:
-    """Nested markup can't nest visually — `d_1` inside a superscript reads `d1`."""
-    return re.sub(r"[\^_]\{([^}]*)\}|[\^_](\S)",
-                  lambda m: m.group(1) if m.group(1) is not None else m.group(2),
-                  text)
+    """One level of raising is all we can draw, so `w^{(2)}` inside a
+    subscript flattens to `w(2)` rather than nesting a third size."""
+    out, i = [], 0
+    while i < len(text):
+        if text[i] in "^_":
+            body, i = _group_at(text, i + 1)
+            out.append(_flatten_markup(body))
+        else:
+            out.append(text[i])
+            i += 1
+    return "".join(out)
 
 
 def parse_segments(text: str) -> list[tuple[str, str]]:
     """('R', 'normal'), ('4×6', 'sup') … from `R^{4\\times6}`."""
     text = replace_symbols(text)
     segs: list[tuple[str, str]] = []
-    pos = 0
-    for m in _SEG_RE.finditer(text):
-        if m.start() > pos:
-            segs.append((text[pos:m.start()], "normal"))
-        if m.group(1) is not None:
-            segs.append((_flatten_markup(m.group(1)), "sup"))
-        elif m.group(2) is not None:
-            segs.append((m.group(2), "sup"))
-        elif m.group(3) is not None:
-            segs.append((_flatten_markup(m.group(3)), "sub"))
-        else:
-            segs.append((m.group(4), "sub"))
-        pos = m.end()
-    if pos < len(text):
-        segs.append((text[pos:], "normal"))
+    buf: list[str] = []
+    i = 0
+    while i < len(text):
+        ch = text[i]
+        if ch in "^_" and i + 1 < len(text):
+            body, nxt = _group_at(text, i + 1)
+            if body:
+                if buf:
+                    segs.append(("".join(buf), "normal"))
+                    buf = []
+                segs.append((_flatten_markup(body),
+                             "sup" if ch == "^" else "sub"))
+                i = nxt
+                continue
+        buf.append(ch)
+        i += 1
+    if buf:
+        segs.append(("".join(buf), "normal"))
     return [s for s in segs if s[0]]
 
 
@@ -306,12 +372,11 @@ def _draw_sheared(mask: Image.Image, run: str, font: ImageFont.FreeTypeFont,
     _stamp(mask, tile, x - pad // 2, top - 2, pressure)
 
 
-# A font draws every 'a' identically, which is the loudest "not handwritten"
-# signal on an otherwise good page. Nudging each glyph's angle/scale/weight
-# breaks that up without needing a model.
-CHAR_ANGLE = 2.2      # degrees, peak
-CHAR_SCALE = 0.045    # fraction, peak
-CHAR_SHIFT = 0.9      # px, peak
+# Variation lives at the *word* level. Per-letter rotate/scale snaps Caveat's
+# joins (the font's whole reason to exist) and reads as typed glyphs on a line.
+WORD_ANGLE = 0.55     # degrees, peak — a written word leans a little
+WORD_SCALE = 0.018    # fraction, peak
+WORD_SHIFT = 0.35     # px, peak
 
 
 def _stamp(mask: Image.Image, tile: Image.Image, x: float, y: float,
@@ -324,24 +389,23 @@ def _stamp(mask: Image.Image, tile: Image.Image, x: float, y: float,
     mask.paste(ImageChops.lighter(region, tile), box)
 
 
-def _draw_char(mask: Image.Image, ch: str, font: ImageFont.FreeTypeFont,
-               x: float, top: float, pressure: int) -> None:
-    """One glyph, slightly rotated/resized so repeats are never identical."""
-    pad = 8
-    w = int(font.getlength(ch)) + pad * 2
-    h = int(font.size * 2.0) + pad * 2
+def _draw_connected(mask: Image.Image, run: str, font: ImageFont.FreeTypeFont,
+                    x: float, top: float, pressure: int) -> None:
+    """Stamp one connected string so ligatures and joins stay intact."""
+    pad = 10
+    w = int(font.getlength(run)) + pad * 2
+    h = int(font.size * 2.2) + pad * 2
     tile = Image.new("L", (max(1, w), max(1, h)), 0)
-    ImageDraw.Draw(tile).text((pad, pad), ch, fill=255, font=font)
+    ImageDraw.Draw(tile).text((pad, pad), run, fill=255, font=font)
 
-    scale = 1.0 + random.uniform(-CHAR_SCALE, CHAR_SCALE)
-    if abs(scale - 1.0) > 0.005:
+    scale = 1.0 + random.uniform(-WORD_SCALE, WORD_SCALE)
+    if abs(scale - 1.0) > 0.004:
         tile = tile.resize((max(1, int(tile.width * scale)),
                             max(1, int(tile.height * scale))), Image.LANCZOS)
-    tile = tile.rotate(random.uniform(-CHAR_ANGLE, CHAR_ANGLE),
+    tile = tile.rotate(random.uniform(-WORD_ANGLE, WORD_ANGLE),
                        resample=Image.BICUBIC, expand=False)
-
-    dx = random.uniform(-CHAR_SHIFT, CHAR_SHIFT)
-    dy = random.uniform(-CHAR_SHIFT, CHAR_SHIFT)
+    dx = random.uniform(-WORD_SHIFT, WORD_SHIFT)
+    dy = random.uniform(-WORD_SHIFT, WORD_SHIFT)
     _stamp(mask, tile, x - pad + dx, top - pad + dy, pressure)
 
 
@@ -349,15 +413,14 @@ def _draw_run(mask: Image.Image, mdraw: ImageDraw.ImageDraw, run: str,
               font: ImageFont.FreeTypeFont, x: float, top: float,
               pressure: int, humanize: bool) -> float:
     """Draw a run of same-font text into the ink mask; returns the new x."""
+    adv = font.getlength(run)
+    if not run.strip():
+        return x + adv
     if not humanize:
         mdraw.text((x, top), run, fill=pressure, font=font)
-        return x + font.getlength(run)
-    for ch in run:
-        adv = font.getlength(ch)
-        if ch.strip():
-            _draw_char(mask, ch, font, x, top, _jitter_pressure(pressure))
-        x += adv
-    return x
+        return x + adv
+    _draw_connected(mask, run, font, x, top, _jitter_pressure(pressure))
+    return x + adv
 
 
 def draw_segments(mask: Image.Image, mdraw: ImageDraw.ImageDraw, x: int,
@@ -375,15 +438,16 @@ def draw_segments(mask: Image.Image, mdraw: ImageDraw.ImageDraw, x: int,
             dy = 0.0
         for run, path in glyph_runs(chunk, font_path):
             f = _load_font(str(path), csize)
-            jitter = random.uniform(-1.2, 1.2) if wobble else 0.0
-            top = baseline_y - (csize * y_ratio) + dy + jitter
+            ascent, _ = f.getmetrics()
+            # Sit on the ruled line: PIL draws from the glyph box top, not baseline.
+            top = baseline_y - ascent + dy
             run_p = _jitter_pressure(pressure) if wobble else pressure
             if path == font_path:
                 x = int(_draw_run(mask, mdraw, run, f, x, top, run_p, wobble))
                 continue
             # Fallback run: the user's own scans, else a drawn pen shape, else
             # the sheared font glyph.
-            base = baseline_y + dy + jitter
+            base = baseline_y + dy
             for ch in run:
                 advance = _draw_handwritten_glyph(mask, ch, x, base, csize, run_p)
                 if advance is None and ch in _PEN_SHAPES:
@@ -437,6 +501,11 @@ SYMBOL_MAP = {
     r"\pm": "±",
     r"\ldots": "…",
     r"\cdots": "…",
+    r"\eta": "η",
+    r"\ell": "ℓ",
+    r"\odot": "⊙",
+    r"\top": "⊤",
+    r"\propto": "∝",
     # Capital Greek — common in DL notation (Σ loss, Δ weights, Θ params).
     r"\Sigma": "Σ",
     r"\Delta": "Δ",
@@ -485,10 +554,10 @@ def make_notebook_page(
     draw.line([(MARGIN_LEFT, 0), (MARGIN_LEFT, PAGE_H)], fill=(220, 100, 100), width=2)
     draw.line([(MARGIN_LEFT - 5, 0), (MARGIN_LEFT - 5, PAGE_H)], fill=(235, 150, 150), width=1)
     
-    # Blue horizontal ruled lines
+    # Blue horizontal ruled lines. Keep them straight and on a fixed grid so
+    # the writing can sit on them; a scan tilt later is enough "paper" noise.
     y = MARGIN_TOP
     while y < PAGE_H - 60:
-        # Slight natural wobble in the ruling lines
         draw.line([(0, y), (PAGE_W, y)], fill=(180, 205, 230), width=1)
         y += LINE_SPACING
     
@@ -526,7 +595,7 @@ def apply_scan_look(img: Image.Image, seed: int | None = None) -> Image.Image:
     rng = random.Random(seed)
     w, h = img.size
 
-    angle = rng.uniform(-0.55, 0.55)
+    angle = rng.uniform(-0.22, 0.22)
     img = img.rotate(angle, resample=Image.BICUBIC, expand=False,
                      fillcolor=(252, 250, 245))
 
@@ -544,7 +613,7 @@ def apply_scan_look(img: Image.Image, seed: int | None = None) -> Image.Image:
 
     arr += np.random.normal(0, 2.1, arr.shape).astype(np.float32)
     out = Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8))
-    return out.filter(ImageFilter.GaussianBlur(radius=0.45))
+    return out.filter(ImageFilter.GaussianBlur(radius=0.18))
 
 
 BASE_PRESSURE = 240
@@ -642,7 +711,7 @@ def _jitter_pressure(pressure: int = BASE_PRESSURE) -> int:
 
 
 def composite_ink(paper: Image.Image, mask: Image.Image, ink_color: tuple,
-                  bleed: float = 0.7) -> Image.Image:
+                  bleed: float = 0.35) -> Image.Image:
     """Lay the ink coverage mask into the paper like wet ink, not vector text.
 
     Crisp font antialiasing is a dead giveaway. Blurring the coverage and then
@@ -719,13 +788,14 @@ def render_assignment(
     header_size = int(font_size * 1.15)
     
     base_ink = INKS.get(ink_name, INKS["blue"])
-    line_h = style["line_height"]
+    # Writing must land on the same grid the blue rules are drawn on.
+    line_h = LINE_SPACING
     
     # Split content into lines and process math
     raw_lines = content.split("\n")
     
     # Calculate usable lines per page
-    usable_top = MARGIN_TOP + 10
+    usable_top = MARGIN_TOP
     usable_bottom = PAGE_H - 100
     lines_per_page = (usable_bottom - usable_top) // line_h
     
@@ -802,14 +872,15 @@ def render_assignment(
                 line_idx += 1
                 continue
             
-            # Real lines start a hair off the margin and slope a little.
+            # Sit on the ruled line. A real notebook line is the baseline;
+            # floating above it is the "typed onto a template" look.
             indent_px = MARGIN_LEFT + 25 + indent * 40
             if wobble:
-                indent_px += int(random.uniform(-3, 4))
-            slope = random.uniform(-0.007, 0.005) if wobble else 0.0
+                indent_px += int(random.uniform(-2, 3))
+            slope = random.uniform(-0.0022, 0.0018) if wobble else 0.0
             
             if kind == "header":
-                wobble_y = random.uniform(-1.5, 1.5) if wobble else 0
+                wobble_y = random.uniform(-0.4, 0.4) if wobble else 0
                 end_x = draw_segments(
                     mask, mdraw, indent_px, baseline_y + wobble_y,
                     parse_segments(text), font_path, header_size,
@@ -837,12 +908,13 @@ def render_assignment(
                 if is_struck:
                     display_word = display_word[2:-2]
 
-                wobble_y = random.uniform(-1.8, 1.8) if wobble else 0
+                wobble_y = random.uniform(-0.45, 0.45) if wobble else 0
                 wobble_y += slope * (x - indent_px)
+                word_size = font_size
                 start_x = x
                 x = draw_segments(
                     mask, mdraw, x, baseline_y + wobble_y,
-                    parse_segments(display_word), font_path, font_size,
+                    parse_segments(display_word), font_path, word_size,
                     BASE_PRESSURE, y_ratio, wobble,
                 )
                 if is_underlined:
@@ -851,7 +923,7 @@ def render_assignment(
                     _strike(mdraw, start_x, x, baseline_y - font_size * 0.28,
                             wobble)
 
-                jitter_x = random.uniform(-1.0, 1.5) if wobble else 0
+                jitter_x = random.uniform(-2.0, 3.2) if wobble else 0
                 x += int(space_w + jitter_x)
             
             current_y_slot += 1
