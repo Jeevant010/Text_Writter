@@ -1,5 +1,6 @@
 @echo off
-REM Multi-page ruled assignment using YOUR handwriting sample (HWT).
+REM HWT assignment pages (needs samples\my_handwriting.png).
+REM For the CPU Caveat+math path used for CS743 A2, use write_pages.bat instead.
 title Text_Writter — Assignment pages
 call .venv\Scripts\activate.bat
 if not exist "samples\my_handwriting.png" if not exist "samples\my_handwriting.jpg" (
