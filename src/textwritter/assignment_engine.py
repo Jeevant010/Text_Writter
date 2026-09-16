@@ -18,7 +18,7 @@ import random
 import re
 from functools import lru_cache
 from pathlib import Path
-from PIL import Image, ImageDraw, ImageFont, ImageFilter
+from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
 import numpy as np
 
 FONTS_DIR = Path(__file__).resolve().parents[2] / "assets" / "fonts"
@@ -234,7 +234,9 @@ def measure_segments(segments: list[tuple[str, str]], font_path: Path,
                 continue
             for ch in run:
                 ratio = aspect(ch)
-                if ratio is None:
+                if ratio is None and ch in _PEN_SHAPES:
+                    total += int(csize * 1.13)
+                elif ratio is None:
                     total += int(f.getlength(ch))
                 else:
                     h_ratio = _GLYPH_METRICS.get(ch, _GLYPH_DEFAULT)[0]
@@ -262,9 +264,10 @@ _GLYPH_METRICS: dict[str, tuple[float, float]] = {
 _GLYPH_DEFAULT = (0.58, 0.0)
 
 
-def _draw_handwritten_glyph(img: Image.Image, ch: str, x: int, baseline_y: float,
-                            size: int, ink: tuple) -> int | None:
-    """Paste one of the user's own symbol scans. Returns advance, or None."""
+def _draw_handwritten_glyph(mask: Image.Image, ch: str, x: int,
+                            baseline_y: float, size: int,
+                            pressure: int) -> int | None:
+    """Stamp one of the user's own symbol scans. Returns advance, or None."""
     from textwritter.glyphs import pick
 
     path = pick(ch)
@@ -282,29 +285,25 @@ def _draw_handwritten_glyph(img: Image.Image, ch: str, x: int, baseline_y: float
     src = src.resize((target_w, target_h), Image.LANCZOS)
 
     arr = np.asarray(src, dtype=np.float32)
-    alpha = np.clip((215.0 - arr) / 120.0, 0.0, 1.0)
-    tile = np.zeros((target_h, target_w, 4), dtype=np.uint8)
-    tile[..., 0], tile[..., 1], tile[..., 2] = ink
-    tile[..., 3] = (alpha * 255).astype(np.uint8)
+    coverage = np.clip((215.0 - arr) / 120.0, 0.0, 1.0) * 255.0
+    tile = Image.fromarray(coverage.astype(np.uint8), "L")
 
-    top = int(baseline_y + size * drop - target_h)
-    img.paste(Image.fromarray(tile, "RGBA"), (int(x), top),
-              Image.fromarray(tile, "RGBA"))
+    _stamp(mask, tile, x, baseline_y + size * drop - target_h, pressure)
     return target_w + max(2, size // 12)
 
 
-def _draw_sheared(img: Image.Image, run: str, font: ImageFont.FreeTypeFont,
-                  x: int, top: float, ink: tuple) -> None:
+def _draw_sheared(mask: Image.Image, run: str, font: ImageFont.FreeTypeFont,
+                  x: int, top: float, pressure: int) -> None:
     """Draw `run` with a right lean so it sits beside handwriting glyphs."""
     w = int(font.getlength(run)) + 6
     h = int(font.size * 2.2)
     pad = int(abs(FALLBACK_SHEAR) * h) + 4
-    tile = Image.new("RGBA", (w + pad, h), (0, 0, 0, 0))
-    ImageDraw.Draw(tile).text((pad // 2, 2), run, fill=(*ink, 255), font=font)
+    tile = Image.new("L", (w + pad, h), 0)
+    ImageDraw.Draw(tile).text((pad // 2, 2), run, fill=255, font=font)
     tile = tile.transform(tile.size, Image.AFFINE,
                           (1, FALLBACK_SHEAR, -FALLBACK_SHEAR * h / 2, 0, 1, 0),
                           resample=Image.BICUBIC)
-    img.paste(tile, (int(x - pad // 2), int(top - 2)), tile)
+    _stamp(mask, tile, x - pad // 2, top - 2, pressure)
 
 
 # A font draws every 'a' identically, which is the loudest "not handwritten"
@@ -315,47 +314,57 @@ CHAR_SCALE = 0.045    # fraction, peak
 CHAR_SHIFT = 0.9      # px, peak
 
 
-def _draw_char(img: Image.Image, ch: str, font: ImageFont.FreeTypeFont,
-               x: float, top: float, ink: tuple) -> None:
+def _stamp(mask: Image.Image, tile: Image.Image, x: float, y: float,
+           pressure: int) -> None:
+    """Add a glyph tile to the page-wide ink coverage mask (max-blend)."""
+    box = (int(x), int(y))
+    region = mask.crop((box[0], box[1], box[0] + tile.width, box[1] + tile.height))
+    if pressure < 255:
+        tile = tile.point(lambda v: v * pressure // 255)
+    mask.paste(ImageChops.lighter(region, tile), box)
+
+
+def _draw_char(mask: Image.Image, ch: str, font: ImageFont.FreeTypeFont,
+               x: float, top: float, pressure: int) -> None:
     """One glyph, slightly rotated/resized so repeats are never identical."""
     pad = 8
     w = int(font.getlength(ch)) + pad * 2
     h = int(font.size * 2.0) + pad * 2
-    mask = Image.new("L", (max(1, w), max(1, h)), 0)
-    ImageDraw.Draw(mask).text((pad, pad), ch, fill=255, font=font)
+    tile = Image.new("L", (max(1, w), max(1, h)), 0)
+    ImageDraw.Draw(tile).text((pad, pad), ch, fill=255, font=font)
 
     scale = 1.0 + random.uniform(-CHAR_SCALE, CHAR_SCALE)
     if abs(scale - 1.0) > 0.005:
-        mask = mask.resize((max(1, int(mask.width * scale)),
-                            max(1, int(mask.height * scale))), Image.LANCZOS)
-    angle = random.uniform(-CHAR_ANGLE, CHAR_ANGLE)
-    mask = mask.rotate(angle, resample=Image.BICUBIC, expand=False)
+        tile = tile.resize((max(1, int(tile.width * scale)),
+                            max(1, int(tile.height * scale))), Image.LANCZOS)
+    tile = tile.rotate(random.uniform(-CHAR_ANGLE, CHAR_ANGLE),
+                       resample=Image.BICUBIC, expand=False)
 
     dx = random.uniform(-CHAR_SHIFT, CHAR_SHIFT)
     dy = random.uniform(-CHAR_SHIFT, CHAR_SHIFT)
-    img.paste(ink, (int(x - pad + dx), int(top - pad + dy)), mask)
+    _stamp(mask, tile, x - pad + dx, top - pad + dy, pressure)
 
 
-def _draw_run(img: Image.Image, draw: ImageDraw.ImageDraw, run: str,
-              font: ImageFont.FreeTypeFont, x: float, top: float, ink: tuple,
-              humanize: bool) -> float:
-    """Draw a run of same-font text; returns the new x cursor."""
+def _draw_run(mask: Image.Image, mdraw: ImageDraw.ImageDraw, run: str,
+              font: ImageFont.FreeTypeFont, x: float, top: float,
+              pressure: int, humanize: bool) -> float:
+    """Draw a run of same-font text into the ink mask; returns the new x."""
     if not humanize:
-        draw.text((x, top), run, fill=ink, font=font)
+        mdraw.text((x, top), run, fill=pressure, font=font)
         return x + font.getlength(run)
     for ch in run:
         adv = font.getlength(ch)
         if ch.strip():
-            _draw_char(img, ch, font, x, top, _jitter_ink(ink, True))
+            _draw_char(mask, ch, font, x, top, _jitter_pressure(pressure))
         x += adv
     return x
 
 
-def draw_segments(img: Image.Image, draw: ImageDraw.ImageDraw, x: int,
+def draw_segments(mask: Image.Image, mdraw: ImageDraw.ImageDraw, x: int,
                   baseline_y: float, segments: list[tuple[str, str]],
-                  font_path: Path, size: int, ink: tuple, y_ratio: float,
+                  font_path: Path, size: int, pressure: int, y_ratio: float,
                   wobble: bool = True) -> int:
-    """Draw rich text; returns the x cursor after the last glyph."""
+    """Draw rich text into the ink mask; returns the x cursor after it."""
     for chunk, kind in segments:
         csize = max(8, int(size * SUP_SCALE)) if kind != "normal" else size
         if kind == "sup":
@@ -368,16 +377,19 @@ def draw_segments(img: Image.Image, draw: ImageDraw.ImageDraw, x: int,
             f = _load_font(str(path), csize)
             jitter = random.uniform(-1.2, 1.2) if wobble else 0.0
             top = baseline_y - (csize * y_ratio) + dy + jitter
-            run_ink = _jitter_ink(ink, wobble)
+            run_p = _jitter_pressure(pressure) if wobble else pressure
             if path == font_path:
-                x = int(_draw_run(img, draw, run, f, x, top, run_ink, wobble))
+                x = int(_draw_run(mask, mdraw, run, f, x, top, run_p, wobble))
                 continue
-            # Fallback run: prefer the user's own handwritten symbol scans.
+            # Fallback run: the user's own scans, else a drawn pen shape, else
+            # the sheared font glyph.
+            base = baseline_y + dy + jitter
             for ch in run:
-                advance = _draw_handwritten_glyph(
-                    img, ch, x, baseline_y + dy + jitter, csize, run_ink)
+                advance = _draw_handwritten_glyph(mask, ch, x, base, csize, run_p)
+                if advance is None and ch in _PEN_SHAPES:
+                    advance = _PEN_SHAPES[ch](mdraw, x, base, csize)
                 if advance is None:
-                    _draw_sheared(img, ch, f, x, top, run_ink)
+                    _draw_sheared(mask, ch, f, x, top, run_p)
                     advance = int(f.getlength(ch))
                 x += advance
     return x
@@ -535,13 +547,127 @@ def apply_scan_look(img: Image.Image, seed: int | None = None) -> Image.Image:
     return out.filter(ImageFilter.GaussianBlur(radius=0.45))
 
 
-def _jitter_ink(base_ink: tuple, wobble: bool = True) -> tuple:
-    """Natural ink pressure variation."""
-    if not wobble:
-        return base_ink
-    r, g, b = base_ink
-    v = random.randint(-10, 10)
-    return (max(0, min(255, r + v)), max(0, min(255, g + v)), max(0, min(255, b + v)))
+BASE_PRESSURE = 240
+
+
+def _hand_line(mdraw: ImageDraw.ImageDraw, x0: float, x1: float, y: float,
+               wobble: bool, width: int = 2) -> None:
+    """A pen line drawn in short segments so it is never perfectly straight."""
+    x0, x1 = float(x0), float(x1)
+    if x1 <= x0:
+        return
+    steps = max(2, int((x1 - x0) // 26))
+    pts = []
+    for i in range(steps + 1):
+        t = i / steps
+        jx = random.uniform(-1.5, 1.5) if wobble else 0.0
+        jy = random.uniform(-1.4, 1.4) if wobble else 0.0
+        pts.append((x0 + (x1 - x0) * t + jx, y + jy))
+    mdraw.line(pts, fill=_jitter_pressure(), width=width, joint="curve")
+
+
+def _underline(mdraw: ImageDraw.ImageDraw, x0: float, x1: float, y: float,
+               wobble: bool) -> None:
+    _hand_line(mdraw, x0, x1, y, wobble)
+
+
+def _strike(mdraw: ImageDraw.ImageDraw, x0: float, x1: float, y: float,
+            wobble: bool) -> None:
+    _hand_line(mdraw, x0 - 2, x1 + 2, y, wobble)
+
+
+# Pressure drifts as you write rather than jumping per letter, so it is a random
+# walk shared across the page instead of independent noise per glyph.
+_PRESSURE = {"v": float(BASE_PRESSURE)}
+
+
+def _wobbly(pts: list[tuple[float, float]], amount: float = 1.1
+            ) -> list[tuple[float, float]]:
+    return [(x + random.uniform(-amount, amount), y + random.uniform(-amount, amount))
+            for x, y in pts]
+
+
+def _pen_arrow(mdraw: ImageDraw.ImageDraw, x: float, baseline: float, size: int,
+               back: bool = False) -> int:
+    """Hand-drawn arrow. A font arrow is dead straight, which reads as typed."""
+    w = size * 0.95
+    y = baseline - size * 0.30
+    stroke = max(2, size // 13)
+    p = _jitter_pressure()
+    x0, x1 = x, x + w
+    mid = (y + random.uniform(-1.4, 1.4))
+    mdraw.line(_wobbly([(x0, y), (x0 + w * 0.5, mid), (x1, y)]),
+               fill=p, width=stroke, joint="curve")
+    tip = (x0, y) if back else (x1, y)
+    d = 1 if back else -1
+    for dy in (-1, 1):
+        mdraw.line(_wobbly([tip, (tip[0] + d * size * 0.26,
+                                  tip[1] + dy * size * 0.20)]),
+                   fill=p, width=stroke, joint="curve")
+    return int(w + size * 0.18)
+
+
+def _pen_in(mdraw: ImageDraw.ImageDraw, x: float, baseline: float,
+            size: int) -> int:
+    """`∈` as a bowl plus a bar, drawn rather than typeset."""
+    h = size * 0.58
+    top = baseline - h
+    w = h * 0.80
+    stroke = max(2, size // 13)
+    p = _jitter_pressure()
+    mdraw.arc([x, top, x + w * 1.6, baseline], start=35, end=325, fill=p,
+              width=stroke)
+    bar_y = top + h * 0.52
+    mdraw.line(_wobbly([(x + w * 0.16, bar_y), (x + w * 0.95, bar_y)], 0.8),
+               fill=p, width=stroke, joint="curve")
+    return int(w + size * 0.20)
+
+
+# Symbols worth drawing by hand because they appear constantly and a font
+# renders them too perfectly.
+_PEN_SHAPES = {
+    "→": lambda d, x, b, s: _pen_arrow(d, x, b, s, back=False),
+    "←": lambda d, x, b, s: _pen_arrow(d, x, b, s, back=True),
+    "∈": _pen_in,
+}
+
+
+def _jitter_pressure(pressure: int = BASE_PRESSURE) -> int:
+    """How hard the pen pressed, drifting smoothly from the last glyph."""
+    v = _PRESSURE["v"] + random.uniform(-7.0, 7.0)
+    # Pull gently back toward the requested level so it cannot wander off.
+    v += (pressure - v) * 0.12
+    _PRESSURE["v"] = max(198.0, min(255.0, v))
+    return int(_PRESSURE["v"])
+
+
+def composite_ink(paper: Image.Image, mask: Image.Image, ink_color: tuple,
+                  bleed: float = 0.7) -> Image.Image:
+    """Lay the ink coverage mask into the paper like wet ink, not vector text.
+
+    Crisp font antialiasing is a dead giveaway. Blurring the coverage and then
+    re-curving it gives soft edges with a dark core, plus stroke-width variation,
+    and a low-frequency field makes the ink flow lighter and darker down the page.
+    """
+    m = mask.filter(ImageFilter.GaussianBlur(bleed))
+    a = np.asarray(m, dtype=np.float32) / 255.0
+    a = np.clip(a * 1.30, 0.0, 1.0) ** 1.45
+
+    h, w = a.shape
+    # Smooth random field ~= ink flow / pen angle drifting as you write.
+    small = np.random.default_rng().normal(0.0, 1.0, (max(2, h // 48),
+                                                     max(2, w // 48)))
+    flow = np.asarray(Image.fromarray(small.astype(np.float32), "F")
+                      .resize((w, h), Image.BICUBIC))
+    a *= np.clip(1.0 + 0.16 * flow, 0.7, 1.25)
+    a = np.clip(a, 0.0, 1.0)
+
+    arr = np.asarray(paper, dtype=np.float32)
+    ink = np.array(ink_color, dtype=np.float32)
+    # Where coverage is thin the paper shows through and the hue lifts slightly.
+    ink_field = ink[None, None, :] + (1.0 - a[..., None]) * 26.0
+    out = arr * (1.0 - a[..., None]) + ink_field * a[..., None]
+    return Image.fromarray(np.clip(out, 0, 255).astype(np.uint8))
 
 
 def _detect_indent(line: str) -> tuple[int, str]:
@@ -650,7 +776,9 @@ def render_assignment(
     
     while line_idx < len(processed_lines):
         img = make_notebook_page(page_num=page_num)
-        draw = ImageDraw.Draw(img)
+        # All pen strokes accumulate in one coverage mask, composited per page.
+        mask = Image.new("L", img.size, 0)
+        mdraw = ImageDraw.Draw(mask)
         
         current_y_slot = 0  # Which ruled line we're on
         
@@ -666,9 +794,9 @@ def render_assignment(
             
             if kind == "sep":
                 sep_y = baseline_y + line_h // 2
-                draw.line(
+                mdraw.line(
                     [(MARGIN_LEFT + 30, sep_y), (MARGIN_RIGHT - 30, sep_y)],
-                    fill=_jitter_ink(base_ink, wobble), width=1,
+                    fill=_jitter_pressure(), width=2,
                 )
                 current_y_slot += 1
                 line_idx += 1
@@ -681,15 +809,13 @@ def render_assignment(
             slope = random.uniform(-0.007, 0.005) if wobble else 0.0
             
             if kind == "header":
-                ink = _jitter_ink(base_ink, wobble)
                 wobble_y = random.uniform(-1.5, 1.5) if wobble else 0
                 end_x = draw_segments(
-                    img, draw, indent_px, baseline_y + wobble_y,
-                    parse_segments(text), font_path, header_size, base_ink,
-                    y_ratio, wobble,
+                    mask, mdraw, indent_px, baseline_y + wobble_y,
+                    parse_segments(text), font_path, header_size,
+                    BASE_PRESSURE, y_ratio, wobble,
                 )
-                draw.line([(indent_px, baseline_y + 2), (end_x, baseline_y + 2)],
-                          fill=ink, width=1)
+                _underline(mdraw, indent_px, end_x, baseline_y + 3, wobble)
                 current_y_slot += 1
                 line_idx += 1
                 continue
@@ -704,18 +830,26 @@ def render_assignment(
                 is_underlined = (word.startswith("__") and word.endswith("__")
                                  and len(word) > 4)
                 display_word = word[2:-2] if is_underlined else word
+                # ~~word~~ = crossed out, the way a real page has corrections
+                is_struck = (display_word.startswith("~~")
+                             and display_word.endswith("~~")
+                             and len(display_word) > 4)
+                if is_struck:
+                    display_word = display_word[2:-2]
 
                 wobble_y = random.uniform(-1.8, 1.8) if wobble else 0
                 wobble_y += slope * (x - indent_px)
                 start_x = x
                 x = draw_segments(
-                    img, draw, x, baseline_y + wobble_y,
-                    parse_segments(display_word), font_path, font_size, base_ink,
-                    y_ratio, wobble,
+                    mask, mdraw, x, baseline_y + wobble_y,
+                    parse_segments(display_word), font_path, font_size,
+                    BASE_PRESSURE, y_ratio, wobble,
                 )
                 if is_underlined:
-                    draw.line([(start_x, baseline_y + 2), (x, baseline_y + 2)],
-                              fill=_jitter_ink(base_ink, wobble), width=1)
+                    _underline(mdraw, start_x, x, baseline_y + 3, wobble)
+                if is_struck:
+                    _strike(mdraw, start_x, x, baseline_y - font_size * 0.28,
+                            wobble)
 
                 jitter_x = random.uniform(-1.0, 1.5) if wobble else 0
                 x += int(space_w + jitter_x)
@@ -723,6 +857,7 @@ def render_assignment(
             current_y_slot += 1
             line_idx += 1
         
+        img = composite_ink(img, mask, base_ink)
         if scan:
             img = apply_scan_look(img)
 
