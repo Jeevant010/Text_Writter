@@ -79,6 +79,11 @@ NEEDED: list[tuple[str, str]] = [
     ("Ω", "Omega big"),
     ("Φ", "Phi big"),
     ("Γ", "Gamma big"),
+    ("η", "eta"),
+    ("ℓ", "script l (loss)"),
+    ("⊙", "odot / hadamard"),
+    ("✓", "check"),
+    ("⊤", "transpose / top"),
     ("∫", "integral"),
     ("±", "plus minus"),
 ]
@@ -95,7 +100,7 @@ MARK_INSET = 70
 BOX_W, BOX_H = 104, 104
 LABEL_W = 92
 GROUP_GAP = 22
-ROW_GAP = 20
+ROW_GAP = 12
 GRID_TOP = 258
 GRID_LEFT = 84
 GROUPS_PER_ROW = 3
